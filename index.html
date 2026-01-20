@@ -20,20 +20,35 @@
             font-family: sans-serif; 
             user-select: none; 
             -webkit-user-select: none; 
-            overscroll-behavior: none; /* Chặn kéo trang trên mobile */
+            overscroll-behavior: none; 
         }
         
-        /* Ẩn thanh cuộn nhưng vẫn cho cuộn */
+        /* Custom Scrollbar cho vùng Canvas */
+        .canvas-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .canvas-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .canvas-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .canvas-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Ẩn scrollbar cho toolbar */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Hiệu ứng trượt lên cho Menu ngữ cảnh */
         @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
         }
         .animate-slide-up {
-            animation: slideUp 0.2s ease-out forwards;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
     </style>
 </head>
@@ -48,12 +63,12 @@
         const GRID_SIZE = 20;
         const COLORS = { wire: '#000000', grid: '#e5e7eb', pvlv: '#ef4444', highlight: '#3b82f6', text: '#000000' };
         
-        const TOOL_BTN_CLASS = "flex flex-col items-center justify-center px-2 py-1 rounded border border-transparent hover:bg-gray-100 min-w-[55px] transition-colors cursor-pointer active:bg-gray-200";
-        const ACTION_BTN_CLASS = "flex items-center gap-2 border px-3 py-2 rounded-full shadow-md bg-white hover:bg-gray-50 transition-all active:scale-95 cursor-pointer text-sm font-medium whitespace-nowrap";
+        const TOOL_BTN_CLASS = "flex flex-col items-center justify-center px-2 py-1 rounded border border-transparent hover:bg-gray-100 min-w-[55px] transition-colors cursor-pointer active:bg-gray-200 touch-manipulation";
+        const ACTION_BTN_CLASS = "flex items-center gap-2 border px-3 py-2 rounded-full shadow-md bg-white hover:bg-gray-50 transition-all active:scale-95 cursor-pointer text-sm font-medium whitespace-nowrap touch-manipulation";
 
         const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
 
-        // --- ICONS (SVG trực tiếp để nhẹ và không lỗi) ---
+        // --- ICONS ---
         const Icons = {
             Minus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
             Zap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
@@ -63,43 +78,42 @@
             RotateCcw: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>,
             Save: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
             Edit: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
-            X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+            Grid: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
         };
 
         const App = () => {
-            // State tính toán kích thước màn hình
-            const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: 600 });
+            // Kích thước Canvas cố định rộng hơn màn hình để scroll
+            const CANVAS_W = 800; 
+            const CANVAS_H = 800;
             
             const [objects, setObjects] = useState([]);
             const [selectedId, setSelectedId] = useState(null);
             const [dragState, setDragState] = useState({ isDragging: false, draggedId: null, startX: 0, startY: 0, initialObj: null, type: 'move', handle: null });
             const svgRef = useRef(null);
+            const containerRef = useRef(null); // Ref để scroll
 
-            // Cập nhật kích thước khi xoay màn hình
+            // Tự động scroll ra giữa khi mở app
             useEffect(() => {
-                const handleResize = () => {
-                    setDimensions({ 
-                        width: Math.max(350, window.innerWidth), // Min width để không bị bể
-                        height: 600 
-                    });
-                };
-                window.addEventListener('resize', handleResize);
-                return () => window.removeEventListener('resize', handleResize);
+                if (containerRef.current) {
+                    const scrollX = (CANVAS_W - window.innerWidth) / 2;
+                    containerRef.current.scrollLeft = Math.max(0, scrollX);
+                }
             }, []);
 
-            // Khởi tạo dữ liệu mẫu
+            // Init Data
             useEffect(() => {
-                const cx = snapToGrid(dimensions.width / 2);
+                const cx = snapToGrid(CANVAS_W / 2);
                 const cy = 100;
                 setObjects([
-                    { id: 'line_src', type: 'line', x1: 20, y1: cy, x2: dimensions.width - 20, y2: cy, strokeWidth: 2, dash: false },
-                    { id: 'txt_src', type: 'text', x: 40, y: cy - 20, text: "Tuyến 475", fontSize: 14, rotate: 0 },
+                    { id: 'line_src', type: 'line', x1: cx - 150, y1: cy, x2: cx + 150, y2: cy, strokeWidth: 2, dash: false },
+                    { id: 'txt_src', type: 'text', x: cx - 140, y: cy - 20, text: "Tuyến 475", fontSize: 14, rotate: 0 },
                     { id: 'dev_fco', type: 'icon_device', subType: 'FCO', x: cx, y: cy + 80, label: "03FCO" },
                     { id: 'line_br', type: 'line', x1: cx, y1: cy, x2: cx, y2: cy + 200, strokeWidth: 2, dash: false },
                     { id: 'junc', type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' },
                     { id: 'load', type: 'icon_load', subType: 'TBA', x: cx, y: cy + 200, label: "TBA 250kVA" }
                 ]);
-            }, []); // Chỉ chạy 1 lần đầu
+            }, []);
 
             // --- XỬ LÝ CHẠM/CHUỘT ---
             const getMousePos = (e) => {
@@ -107,7 +121,6 @@
                 const CTM = svgRef.current.getScreenCTM();
                 if (!CTM) return { x: 0, y: 0 };
                 
-                // Hỗ trợ cả Touch và Mouse
                 let clientX, clientY;
                 if (e.changedTouches && e.changedTouches.length > 0) {
                     clientX = e.changedTouches[0].clientX;
@@ -124,9 +137,8 @@
             };
 
             const handlePointerDown = (e, obj, type = 'move', handle = null) => {
-                // Quan trọng: preventDefault giúp chặn scroll khi đang kéo vật thể
                 if (e.target.tagName !== 'BUTTON') { 
-                   // e.preventDefault(); // Comment lại nếu muốn scroll canvas, nhưng tốt nhất nên để
+                   // Cho phép scroll canvas nếu chạm vào nền
                 }
                 e.stopPropagation();
                 
@@ -137,7 +149,7 @@
 
             const handlePointerMove = (e) => {
                 if (!dragState.isDragging) return;
-                e.preventDefault(); // Chặn cuộn trang khi đang kéo
+                e.preventDefault(); 
                 const pos = getMousePos(e);
                 const dx = pos.x - dragState.startX;
                 const dy = pos.y - dragState.startY;
@@ -173,26 +185,31 @@
 
             const handlePointerUp = () => setDragState({ ...dragState, isDragging: false, draggedId: null });
             
-            // Xử lý click vào vùng trống để bỏ chọn
             const handleCanvasClick = (e) => {
                 if (e.target === svgRef.current) setSelectedId(null);
             }
 
-            // --- THÊM ĐỐI TƯỢNG ---
+            // --- THÊM ĐỐI TƯỢNG (Vào giữa vùng nhìn thấy) ---
             const addObj = (newObj) => {
                 setObjects([...objects, newObj]);
                 setSelectedId(newObj.id);
             };
-            const cx = snapToGrid(dimensions.width/2);
-            const cy = snapToGrid(200);
+            
+            const getCenterView = () => {
+                if (!containerRef.current) return { x: CANVAS_W/2, y: 200 };
+                // Lấy toạ độ giữa vùng đang scroll tới
+                const x = containerRef.current.scrollLeft + containerRef.current.clientWidth / 2;
+                const y = containerRef.current.scrollTop + containerRef.current.clientHeight / 2;
+                return { x: snapToGrid(x), y: snapToGrid(y) };
+            };
 
-            const addLine = () => addObj({ id: `l_${Date.now()}`, type: 'line', x1: cx-60, y1: cy, x2: cx+60, y2: cy, strokeWidth: 2, dash: false });
-            const addDevice = (type) => addObj({ id: `d_${Date.now()}`, type: 'icon_device', subType: type, x: cx, y: cy, label: type === 'FCO' ? "03FCO" : "CB" });
-            const addLoad = (type) => addObj({ id: `ld_${Date.now()}`, type: 'icon_load', subType: type, x: cx, y: cy+60, label: type === 'TBA' ? "TBA..." : "Tủ..." });
-            const addGround = (dir) => addObj({ id: `g_${Date.now()}`, type: 'icon_ground', direction: dir, x: cx, y: cy+100 });
-            const addPVLV = () => addObj({ id: `p_${Date.now()}`, type: 'rect_pvlv', x: cx-60, y: cy, width: 120, height: 100 });
-            const addText = () => addObj({ id: `t_${Date.now()}`, type: 'text', x: cx, y: cy-40, text: "Ghi chú...", fontSize: 14, rotate: 0 });
-            const addJunc = () => addObj({ id: `j_${Date.now()}`, type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' });
+            const addLine = () => { const c = getCenterView(); addObj({ id: `l_${Date.now()}`, type: 'line', x1: c.x-60, y1: c.y, x2: c.x+60, y2: c.y, strokeWidth: 2, dash: false }); };
+            const addDevice = (type) => { const c = getCenterView(); addObj({ id: `d_${Date.now()}`, type: 'icon_device', subType: type, x: c.x, y: c.y, label: type === 'FCO' ? "03FCO" : "CB" }); };
+            const addLoad = (type) => { const c = getCenterView(); addObj({ id: `ld_${Date.now()}`, type: 'icon_load', subType: type, x: c.x, y: c.y, label: type === 'TBA' ? "TBA..." : "Tủ..." }); };
+            const addGround = (dir) => { const c = getCenterView(); addObj({ id: `g_${Date.now()}`, type: 'icon_ground', direction: dir, x: c.x, y: c.y }); };
+            const addPVLV = () => { const c = getCenterView(); addObj({ id: `p_${Date.now()}`, type: 'rect_pvlv', x: c.x-60, y: c.y, width: 120, height: 100 }); };
+            const addText = () => { const c = getCenterView(); addObj({ id: `t_${Date.now()}`, type: 'text', x: c.x, y: c.y, text: "Ghi chú...", fontSize: 14, rotate: 0 }); };
+            const addJunc = () => { const c = getCenterView(); addObj({ id: `j_${Date.now()}`, type: 'circle', cx: c.x, cy: c.y, r: 4, fill: 'black' }); };
 
             // --- CHỈNH SỬA ---
             const editText = () => {
@@ -218,8 +235,8 @@
                 <div className="flex flex-col h-full">
                     {/* Header */}
                     <div className="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-10 shrink-0">
-                        <h1 className="text-sm font-bold uppercase truncate">Sơ Đồ Đơn Tuyến</h1>
-                        <button onClick={() => alert("Đã lưu!")} className="text-xs bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded flex items-center gap-1 shadow font-bold"><Icons.Save /> Lưu</button>
+                        <h1 className="text-sm font-bold uppercase truncate flex items-center gap-2"><Icons.Grid /> Sơ Đồ Đơn Tuyến</h1>
+                        <button onClick={() => alert("Đã lưu!")} className="text-xs bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded flex items-center gap-1 shadow font-bold active:scale-95 transition-transform"><Icons.Save /> Lưu</button>
                     </div>
 
                     {/* Toolbar (Scrollable) */}
@@ -245,11 +262,11 @@
                         </div>
                     </div>
 
-                    {/* Canvas Area */}
-                    <div className="flex-1 bg-gray-200 overflow-auto relative touch-none" 
+                    {/* Canvas Area (Scrollable) */}
+                    <div ref={containerRef} className="flex-1 bg-gray-200 overflow-auto canvas-scroll relative touch-pan-x touch-pan-y" 
                          onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onPointerMove={handlePointerMove}>
                         
-                        <div className="bg-white shadow-xl m-4 origin-top-left" style={{width: dimensions.width, height: 600, minWidth: '350px'}}>
+                        <div className="bg-white shadow-xl m-4 origin-top-left" style={{width: CANVAS_W, height: CANVAS_H}}>
                             <svg ref={svgRef} width="100%" height="100%" 
                                  onPointerDown={handleCanvasClick}
                                  style={{ touchAction: 'none' }}>
@@ -329,7 +346,7 @@
                         </div>
                     </div>
 
-                    {/* CONTEXT MENU FLOATING (QUAN TRỌNG: DÙNG FIXED BOTTOM ĐỂ KHÔNG BỊ KHUẤT) */}
+                    {/* CONTEXT MENU FLOATING (CENTERED) */}
                     {selectedId && (
                         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-4 py-3 rounded-full shadow-2xl border border-gray-200 flex items-center gap-3 animate-slide-up z-50 overflow-x-auto max-w-[90%] no-scrollbar">
                             
