@@ -1,2 +1,304 @@
-# Khao-sat-hien-truong
-Khảo sát hiện trường
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Biên Tập Sơ Đồ Đơn Tuyến</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel để dịch JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS (Dùng CDN cho nhanh) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: sans-serif; user-select: none; -webkit-user-select: none; }
+        /* Ẩn scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden">
+
+    <div id="root" class="h-full flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- CẤU HÌNH ---
+        const GRID_SIZE = 20;
+        const CANVAS_WIDTH = window.innerWidth > 600 ? 600 : window.innerWidth - 32;
+        const CANVAS_HEIGHT = 600;
+        const COLORS = { wire: '#000000', grid: '#e5e7eb', pvlv: '#ef4444', highlight: '#3b82f6', text: '#000000' };
+        
+        // Helper Classes
+        const TOOL_BTN_CLASS = "flex flex-col items-center justify-center px-2 py-1 rounded border border-transparent hover:bg-gray-100 min-w-[50px] transition-colors cursor-pointer";
+        const ACTION_BTN_CLASS = "flex items-center gap-2 border px-4 py-2 rounded shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer text-sm font-medium";
+
+        // Helper Function
+        const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
+
+        // --- ICON SVG (Thay thế Lucide để chạy độc lập) ---
+        const Icons = {
+            Minus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+            Zap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+            Square: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>,
+            Type: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>,
+            Trash2: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+            RotateCcw: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>,
+            Save: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
+            Edit: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        };
+
+        // --- APP COMPONENT ---
+        const App = () => {
+            const [objects, setObjects] = useState([]);
+            const [selectedId, setSelectedId] = useState(null);
+            const [dragState, setDragState] = useState({ isDragging: false, draggedId: null, startX: 0, startY: 0, initialObj: null, type: 'move', handle: null });
+            const svgRef = useRef(null);
+
+            // Init Data
+            useEffect(() => {
+                const centerX = snapToGrid(CANVAS_WIDTH / 2);
+                setObjects([
+                    { id: 'line_source', type: 'line', x1: 20, y1: 60, x2: CANVAS_WIDTH - 20, y2: 60, strokeWidth: 2, dash: false },
+                    { id: 'txt_source', type: 'text', x: 20, y: 40, text: "Tuyến 475", fontSize: 14, rotate: 0 },
+                    { id: 'line_branch', type: 'line', x1: centerX, y1: 60, x2: centerX, y2: 400, strokeWidth: 2, dash: false },
+                    { id: 'junc_1', type: 'circle', cx: centerX, cy: 60, r: 4, fill: 'black' },
+                    { id: 'dev_fco', type: 'icon_device', subType: 'FCO', x: centerX, y: 140, label: "03FCO" },
+                    { id: 'load_tba', type: 'icon_load', subType: 'TBA', x: centerX, y: 320, label: "TBA 250kVA" }
+                ]);
+            }, []);
+
+            // --- MOUSE HANDLERS ---
+            const getMousePos = (e) => {
+                if (!svgRef.current) return { x: 0, y: 0 };
+                const CTM = svgRef.current.getScreenCTM();
+                if (!CTM) return { x: 0, y: 0 };
+                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: (clientX - CTM.e) / CTM.a, y: (clientY - CTM.f) / CTM.d };
+            };
+
+            const handlePointerDown = (e, obj, type = 'move', handle = null) => {
+                e.preventDefault(); e.stopPropagation();
+                if (type === 'action') return;
+                const pos = getMousePos(e);
+                setSelectedId(obj.id);
+                setDragState({ isDragging: true, draggedId: obj.id, startX: pos.x, startY: pos.y, initialObj: { ...obj }, type: type, handle: handle });
+            };
+
+            const handlePointerMove = (e) => {
+                if (!dragState.isDragging) return;
+                e.preventDefault();
+                const pos = getMousePos(e);
+                const dx = pos.x - dragState.startX;
+                const dy = pos.y - dragState.startY;
+
+                setObjects(prev => prev.map(obj => {
+                    if (obj.id !== dragState.draggedId) return obj;
+                    const init = dragState.initialObj;
+
+                    if (dragState.type === 'resize') {
+                        if (obj.type === 'rect_pvlv') {
+                            let newW = snapToGrid(init.width + (dragState.handle === 'se' ? dx : 0));
+                            let newH = snapToGrid(init.height + (dragState.handle === 'se' ? dy : 0));
+                            return { ...obj, width: Math.max(20, newW), height: Math.max(20, newH) };
+                        }
+                        if (obj.type === 'line') {
+                            if (dragState.handle === 'start') return { ...obj, x1: snapToGrid(init.x1 + dx), y1: snapToGrid(init.y1 + dy) };
+                            if (dragState.handle === 'end') return { ...obj, x2: snapToGrid(init.x2 + dx), y2: snapToGrid(init.y2 + dy) };
+                        }
+                        return obj;
+                    }
+
+                    if (obj.type === 'line') {
+                        return { ...obj, x1: snapToGrid(init.x1 + dx), y1: snapToGrid(init.y1 + dy), x2: snapToGrid(init.x2 + dx), y2: snapToGrid(init.y2 + dy) };
+                    } else if (obj.type === 'circle') {
+                        return { ...obj, cx: snapToGrid(init.cx + dx), cy: snapToGrid(init.cy + dy) };
+                    } else {
+                        return { ...obj, x: snapToGrid(init.x + dx), y: snapToGrid(init.y + dy) };
+                    }
+                }));
+            };
+
+            const handlePointerUp = () => setDragState({ ...dragState, isDragging: false, draggedId: null });
+
+            // --- ADDING OBJECTS ---
+            const addLine = () => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2); setObjects([...objects, { id: `line_${Date.now()}`, type: 'line', x1: cx-60, y1: cy, x2: cx+60, y2: cy, strokeWidth: 2, dash: false }]); };
+            const addDevice = (type) => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2); setObjects([...objects, { id: `dev_${Date.now()}`, type: 'icon_device', subType: type, x: cx, y: cy, label: type === 'FCO' ? "03FCO" : "CB" }]); };
+            const addLoad = (type) => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2+60); setObjects([...objects, { id: `load_${Date.now()}`, type: 'icon_load', subType: type, x: cx, y: cy, label: type === 'TBA' ? "TBA..." : "Tủ..." }]); };
+            const addGround = (dir) => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2+100); setObjects([...objects, { id: `gnd_${Date.now()}`, type: 'icon_ground', direction: dir, x: cx, y: cy }]); };
+            const addPVLV = () => { const cx = snapToGrid(CANVAS_WIDTH/2-60); const cy = snapToGrid(CANVAS_HEIGHT/2); setObjects([...objects, { id: `pvlv_${Date.now()}`, type: 'rect_pvlv', x: cx, y: cy, width: 120, height: 100 }]); };
+            const addText = () => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2-40); setObjects([...objects, { id: `txt_${Date.now()}`, type: 'text', x: cx, y: cy, text: "Ghi chú...", fontSize: 14, rotate: 0 }]); };
+            const addJunction = () => { const cx = snapToGrid(CANVAS_WIDTH/2); const cy = snapToGrid(CANVAS_HEIGHT/2); setObjects([...objects, { id: `junc_${Date.now()}`, type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' }]); };
+
+            // --- MODIFYING OBJECTS ---
+            const editText = () => {
+                const obj = objects.find(o => o.id === selectedId);
+                if (!obj) return;
+                const current = obj.type === 'text' ? obj.text : obj.label;
+                const next = prompt("Nhập nội dung mới:", current);
+                if (next !== null) setObjects(prev => prev.map(o => o.id === selectedId ? (o.type === 'text' ? { ...o, text: next } : { ...o, label: next }) : o));
+            };
+            const toggleDash = () => setObjects(prev => prev.map(o => o.id === selectedId && o.type === 'line' ? { ...o, dash: !o.dash } : o));
+            const rotate = () => setObjects(prev => prev.map(o => {
+                if (o.id !== selectedId) return o;
+                if (o.type === 'line') {
+                    const mx = (o.x1+o.x2)/2, my = (o.y1+o.y2)/2, dx = o.x1-mx, dy = o.y1-my;
+                    return { ...o, x1: snapToGrid(mx-dy), y1: snapToGrid(my+dx), x2: snapToGrid(mx+dy), y2: snapToGrid(my-dx) };
+                }
+                return o.type === 'text' ? { ...o, rotate: o.rotate === 0 ? -90 : 0 } : o;
+            }));
+            const deleteObj = () => { setObjects(objects.filter(o => o.id !== selectedId)); setSelectedId(null); };
+
+            // --- RENDER ---
+            return (
+                <React.Fragment>
+                    {/* Header */}
+                    <div className="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-10 shrink-0">
+                        <h1 className="text-sm font-bold uppercase">Sơ Đồ Đơn Tuyến</h1>
+                        <div className="flex gap-2">
+                            <button onClick={() => setObjects([])} className="text-xs bg-blue-700 px-2 py-1 rounded hover:bg-blue-800">Xóa Hết</button>
+                            <button onClick={() => alert("Đã lưu!")} className="text-xs bg-green-600 px-3 py-1 rounded flex items-center gap-1 hover:bg-green-700"><Icons.Save /> Lưu</button>
+                        </div>
+                    </div>
+
+                    {/* Toolbar */}
+                    <div className="bg-white border-b p-2 flex gap-2 overflow-x-auto no-scrollbar shadow-sm shrink-0">
+                        <div className="flex items-center gap-1 border-r pr-2 shrink-0">
+                            <button onClick={addLine} className={TOOL_BTN_CLASS}><Icons.Minus /> <span className="text-[10px] mt-1">Dây</span></button>
+                            <button onClick={addJunction} className={TOOL_BTN_CLASS}><div className="w-3 h-3 bg-black rounded-full mb-1"></div> <span className="text-[10px]">Nút</span></button>
+                        </div>
+                        <div className="flex items-center gap-1 border-r pr-2 shrink-0">
+                            <button onClick={() => addDevice('FCO')} className={TOOL_BTN_CLASS}><Icons.Zap /> <span className="text-[10px] mt-1">FCO</span></button>
+                            <button onClick={() => addDevice('CB')} className={TOOL_BTN_CLASS}><Icons.Square /> <span className="text-[10px] mt-1">CB</span></button>
+                        </div>
+                        <div className="flex items-center gap-1 border-r pr-2 shrink-0">
+                            <button onClick={() => addLoad('TBA')} className={TOOL_BTN_CLASS}><div className="text-xs font-bold border border-gray-400 rounded px-1 mb-1">TBA</div> <span className="text-[10px]">MBA</span></button>
+                            <button onClick={() => addLoad('TU_DIEN')} className={TOOL_BTN_CLASS}><Icons.Square /> <span className="text-[10px] mt-1">Tủ</span></button>
+                        </div>
+                        <div className="flex items-center gap-1 border-r pr-2 shrink-0">
+                            <button onClick={() => addGround('left')} className={TOOL_BTN_CLASS}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" className="mb-1"><line x1="2" y1="2" x2="14" y2="14" stroke="black" strokeWidth="1.5"/><circle cx="2" cy="2" r="1.5" fill="black"/></svg>
+                                <span className="text-[10px]">TĐ(T)</span>
+                            </button>
+                            <button onClick={() => addGround('right')} className={TOOL_BTN_CLASS}>
+                                <svg width="16" height="16" viewBox="0 0 16 16" className="mb-1"><line x1="14" y1="2" x2="2" y2="14" stroke="black" strokeWidth="1.5"/><circle cx="14" cy="2" r="1.5" fill="black"/></svg>
+                                <span className="text-[10px]">TĐ(P)</span>
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={addPVLV} className={TOOL_BTN_CLASS}><Icons.Square className="text-red-500 border-dashed" /> <span className="text-[10px] mt-1">PVLV</span></button>
+                            <button onClick={addText} className={TOOL_BTN_CLASS}><Icons.Type /> <span className="text-[10px] mt-1">Chữ</span></button>
+                        </div>
+                    </div>
+
+                    {/* Canvas */}
+                    <div className="flex-1 bg-gray-200 overflow-auto flex justify-center p-4" 
+                         onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onPointerMove={handlePointerMove}>
+                        <div className="bg-white shadow-xl relative" style={{width: CANVAS_WIDTH, height: CANVAS_HEIGHT}}>
+                            <svg ref={svgRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} 
+                                 onPointerDown={(e) => { if(e.target === svgRef.current) setSelectedId(null); }}
+                                 style={{ touchAction: 'none' }}>
+                                <defs>
+                                    <pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse">
+                                        <path d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`} fill="none" stroke={COLORS.grid} strokeWidth="1"/>
+                                    </pattern>
+                                </defs>
+                                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                                {objects.map(obj => {
+                                    const isSelected = obj.id === selectedId;
+                                    
+                                    if (obj.type === 'line') return (
+                                        <g key={obj.id}>
+                                            <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj)}/>
+                                            <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="transparent" strokeWidth="15" style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj)}/>
+                                            {isSelected && <circle cx={obj.x1} cy={obj.y1} r="5" fill={COLORS.highlight} style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj, 'resize', 'start')}/>}
+                                            {isSelected && <circle cx={obj.x2} cy={obj.y2} r="5" fill={COLORS.highlight} style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj, 'resize', 'end')}/>}
+                                        </g>
+                                    );
+                                    if (obj.type === 'circle') return <circle key={obj.id} cx={obj.cx} cy={obj.cy} r={obj.r} fill="black" style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj)}/>;
+                                    
+                                    if (obj.type === 'icon_device') return (
+                                        <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} onPointerDown={(e) => handlePointerDown(e, obj)} style={{cursor: 'move'}}>
+                                            <rect x="-20" y="-20" width="40" height="40" fill="transparent"/>
+                                            {obj.subType === 'FCO' ? <g stroke="black" strokeWidth="2"><rect x="-8" y="-15" width="16" height="30" fill="white"/><line x1="-8" y1="-15" x2="15" y2="-25"/><circle cx="15" cy="-25" r="2" fill="white"/></g> 
+                                            : <g stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>}
+                                            <text x="20" y="5" fontSize="12" fontWeight="bold">{obj.label}</text>
+                                            {isSelected && <rect x="-20" y="-20" width="40" height="40" fill="none" stroke={COLORS.highlight} strokeDasharray="2 2"/>}
+                                        </g>
+                                    );
+
+                                    if (obj.type === 'icon_load') return (
+                                        <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} onPointerDown={(e) => handlePointerDown(e, obj)} style={{cursor: 'move'}}>
+                                            <rect x="-25" y="-25" width="50" height="50" fill="transparent"/>
+                                            {obj.subType === 'TBA' ? <g stroke="black" strokeWidth="2" fill="none"><circle cx="0" cy="-8" r="14" fill="white"/><circle cx="0" cy="8" r="14" fill="white"/></g>
+                                            : <rect x="-18" y="-25" width="36" height="50" fill="white" stroke="black" strokeWidth="2"/>}
+                                            <text x="25" y="5" fontSize="12" fontWeight="bold">{obj.label}</text>
+                                            {isSelected && <rect x="-25" y="-25" width="50" height="50" fill="none" stroke={COLORS.highlight} strokeDasharray="2 2"/>}
+                                        </g>
+                                    );
+
+                                    if (obj.type === 'icon_ground') {
+                                        const dx = obj.direction === 'left' ? -20 : 20, dy = -20;
+                                        return (
+                                            <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} onPointerDown={(e) => handlePointerDown(e, obj)} style={{cursor: 'move'}}>
+                                                <rect x="-25" y="-25" width="50" height="35" fill="transparent"/>
+                                                <line x1={dx} y1={dy} x2="0" y2="0" stroke="black" strokeWidth="2"/><circle cx={dx} cy={dy} r="3" fill="black"/>
+                                                <line x1="-15" y1="0" x2="15" y2="0" stroke="black" strokeWidth="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" strokeWidth="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" strokeWidth="2"/>
+                                                {isSelected && <rect x="-25" y="-25" width="50" height="35" fill="none" stroke={COLORS.highlight} strokeDasharray="2 2"/>}
+                                            </g>
+                                        );
+                                    }
+
+                                    if (obj.type === 'text') return (
+                                        <text key={obj.id} x={obj.x} y={obj.y} fontSize={obj.fontSize} fill={isSelected ? COLORS.highlight : "black"} 
+                                              style={{cursor: 'move'}} transform={`rotate(${obj.rotate || 0}, ${obj.x}, ${obj.y})`}
+                                              onPointerDown={(e) => handlePointerDown(e, obj)} onDoubleClick={editText}>
+                                            {obj.text}
+                                        </text>
+                                    );
+
+                                    if (obj.type === 'rect_pvlv') return (
+                                        <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}>
+                                            <rect width={obj.width} height={obj.height} fill="rgba(239, 68, 68, 0.05)" stroke={COLORS.pvlv} strokeWidth="2" strokeDasharray="5 5" style={{cursor: 'move'}} onPointerDown={(e) => handlePointerDown(e, obj)}/>
+                                            <text x="5" y="15" fill={COLORS.pvlv} fontSize="10" fontWeight="bold">PVLV</text>
+                                            {isSelected && <rect x={obj.width - 15} y={obj.height - 15} width="15" height="15" fill="white" stroke={COLORS.highlight} strokeWidth="2" style={{cursor: 'nwse-resize'}} onPointerDown={(e) => handlePointerDown(e, obj, 'resize', 'se')}/>}
+                                        </g>
+                                    );
+                                    return null;
+                                })}
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Context Menu */}
+                    {selectedId && (
+                        <div className="bg-white border-t p-3 flex justify-center gap-4 shrink-0 animate-bounce-up">
+                            {['text', 'icon_device', 'icon_load'].includes(objects.find(o => o.id === selectedId)?.type) && (
+                                <button onClick={editText} className={ACTION_BTN_CLASS + " text-orange-600 border-orange-200 bg-orange-50"}><Icons.Edit/> Sửa Chữ</button>
+                            )}
+                            {(objects.find(o => o.id === selectedId)?.type === 'text' || objects.find(o => o.id === selectedId)?.type === 'line') && (
+                                <button onClick={rotate} className={ACTION_BTN_CLASS + " text-purple-600 border-purple-200"}><Icons.RotateCcw/> Xoay</button>
+                            )}
+                            {objects.find(o => o.id === selectedId)?.type === 'line' && (
+                                <button onClick={toggleDash} className={ACTION_BTN_CLASS + " text-blue-600 border-blue-200"}><Icons.Minus/> Nét Đứt/Liền</button>
+                            )}
+                            <button onClick={deleteObj} className={ACTION_BTN_CLASS + " text-red-600 border-red-200 bg-red-50"}><Icons.Trash2/> Xóa</button>
+                        </div>
+                    )}
+                </React.Fragment>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
