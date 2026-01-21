@@ -107,9 +107,7 @@
         const addTemplate = (template) => {
             let textToAdd = template;
             if (contextData) {
-                // Tạo mã trụ đầy đủ: 478CD + / + 259/4
-                const fullPoleCode = contextData.sub ? `${contextData.code}/${contextData.sub}` : contextData.code;
-                
+                const fullPoleCode = `${contextData.code}/${contextData.sub}`;
                 textToAdd = textToAdd
                     .replace(/{tru}/g, fullPoleCode)
                     .replace(/{tuyen}/g, contextData.line || "...");
@@ -145,19 +143,20 @@
 
         // --- FORM DATA ---
         const [formData, setFormData] = useState({
+            // Header
             donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ",
             ngay: new Date().getDate(),
             thang: new Date().getMonth() + 1,
             nam: new Date().getFullYear(),
             gioKhaoSat: "07:30",
             
-            // Địa điểm
-            loc_poleCode: "478CD", 
-            loc_subCode: "259/4",  
-            loc_lineName: "478 Cái Dầu", 
-            loc_commune: "Thạnh Mỹ Tây", 
+            // Địa điểm chi tiết
+            loc_poleCode: "", 
+            loc_subCode: "",  
+            loc_lineName: "", 
+            loc_commune: "", 
 
-            // Nhân sự - ĐỂ TRỐNG
+            // Nhân sự
             dvct_daiDien1: "", dvct_chucVu1: "",
             dvct_daiDien2: "", dvct_chucVu2: "",
             qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "",
@@ -165,9 +164,9 @@
             dv_lienQuan: "",
 
             // Nội dung
-            muc4_diaDiem: "Tại TBA KDC OLV 1 trụ 478CD/259/4...",
+            muc4_diaDiem: "",
             muc5_noiDung: "Thay điện kế định kỳ",
-            muc6_phamVi: "Tại tủ điện kế trụ 478CD/259/4 tuyến 478 Cái Dầu",
+            muc6_phamVi: "",
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", muc7_ngay: "2026-01-06",
 
             // 8. Đánh giá rủi ro
@@ -224,7 +223,6 @@
             }));
         };
 
-        // --- SỬA LẠI TAGS THEO YÊU CẦU ---
         const tags9a = [
             { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" },
             { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" },
@@ -263,7 +261,6 @@
             setFormData({...formData, [listKey]: newRisks});
         };
 
-        // Hàm lấy dữ liệu ngữ cảnh cho Quick Input
         const getContextData = () => {
             return { 
                 code: formData.loc_poleCode, 
@@ -309,24 +306,25 @@
                         
                         <span>tại trụ</span>
                         
-                        {/* 1. Mã Trụ: Input List */}
+                        {/* 1. Mã Trụ: MỞ RỘNG NHIỀU HƠN (200px) */}
                         <input list="pole-list" 
-                               className="border-b border-gray-300 font-bold bg-transparent outline-none w-[80px] text-center" 
+                               className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" 
                                value={formData.loc_poleCode} 
                                onChange={handlePoleChange} 
-                               placeholder="Chọn..." />
+                               placeholder="Chọn/Nhập mã..." />
                         
                         <span>/</span>
-                        <input className="border-b border-gray-300 outline-none font-bold w-16 text-center" 
+                        {/* 2. Số phụ */}
+                        <input className="border-b border-gray-300 outline-none font-bold w-45 text-center" 
                                value={formData.loc_subCode} 
                                onChange={e => setFormData({...formData, loc_subCode: e.target.value})} 
                                placeholder="..." />
                         
                         <span>tuyến</span>
                         
-                        {/* 3. Tên tuyến: Input List */}
+                        {/* 3. Tên tuyến: THU GỌN LẠI (100px) */}
                         <input list="line-list" 
-                               className="font-bold border-b border-gray-300 min-w-[150px] px-1 text-center text-blue-800 bg-transparent outline-none"
+                               className="font-bold border-b border-gray-300 w-[180px] px-1 text-center text-blue-800 bg-transparent outline-none"
                                value={formData.loc_lineName}
                                onChange={e => setFormData({...formData, loc_lineName: e.target.value})}
                                placeholder="..." />
@@ -393,8 +391,8 @@
                                     <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">CV:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div>
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">ĐV:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div>
                                 </div>
                             </div>
                             {/* 2.2 */}
@@ -404,8 +402,8 @@
                                     <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">CV:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div>
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">ĐV:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div>
                                 </div>
                             </div>
                         </div>
