@@ -16,6 +16,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         body { font-family: 'Times New Roman', sans-serif; background-color: #f3f4f6; }
         .a4-paper { background: white; max-width: 210mm; margin: 0 auto; padding: 10mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); min-height: 297mm; }
@@ -68,49 +71,19 @@
     const { useState, useEffect, useRef } = React;
     const { Save, Plus, Trash2, FileText, Share2, Printer } = lucide;
 
-    // --- DATA MẪU NHÂN SỰ ---
-    const STAFF_LIST = [
-        "Cao Thành Tân",
-        "Nguyễn Văn Tâm",
-        "Lê Thành Được",
-        "Nguyễn Nhựt Minh",
-        "Trần Văn A",
-        "Lê Văn B"
-    ];
+    // --- CẤU HÌNH SUPABASE ---
+    const supabaseUrl = 'https://wvcjrmcahndwenqnkdim.supabase.co'
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y2pybWNhaG5kd2VucW5rZGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NTI4NjQsImV4cCI6MjA4NDUyODg2NH0.GoacKpBBCut6yhmYUWTLeAdbsGwzJSR2AQJrON5mEvM'
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    const POSITIONS = [
-        "",
-        "CHTT",
-        "GSAT",
-        "TT", 
-        "KTV", 
-        "CN",  
-        "Đội trưởng",
-        "Đội phó"
-    ];
-
-    const UNITS = [
-        "",
-        "ĐQLĐCP", 
-        "ĐQLĐTC", 
-        "P.KTAT",
-        "P.KHKT"
-    ];
-
-    // --- COMPONENT CHỌN GIỜ 24H (Full 60 phút) ---
+    // --- COMPONENT CHỌN GIỜ 24H ---
     const TimeSelect = ({ value, onChange }) => {
-        // Tách chuỗi HH:mm thành giờ và phút
         const [hour, minute] = value ? value.split(':') : ['07', '00'];
-        
-        // Tạo mảng Giờ: 00 -> 23
         const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
-        
-        // Tạo mảng Phút: 00 -> 59 (Đủ 60 phút)
         const minutes = Array.from({length: 60}, (_, i) => i.toString().padStart(2, '0')); 
 
         const handleChange = (type, val) => {
-            let newH = hour;
-            let newM = minute;
+            let newH = hour, newM = minute;
             if (type === 'h') newH = val;
             if (type === 'm') newM = val;
             onChange(`${newH}:${newM}`);
@@ -118,13 +91,11 @@
 
         return (
             <div className="inline-flex items-center border-b-2 border-gray-300 hover:border-blue-500 bg-transparent gap-0 transition-colors">
-                <select value={hour} onChange={(e) => handleChange('h', e.target.value)} 
-                        className="appearance-none bg-transparent font-bold text-center outline-none cursor-pointer p-1 text-gray-800 hover:bg-gray-100 rounded">
+                <select value={hour} onChange={(e) => handleChange('h', e.target.value)} className="appearance-none bg-transparent font-bold text-center outline-none cursor-pointer p-1 text-gray-800 hover:bg-gray-100 rounded">
                     {hours.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
                 <span className="font-bold px-0.5">:</span>
-                <select value={minute} onChange={(e) => handleChange('m', e.target.value)} 
-                        className="appearance-none bg-transparent font-bold text-center outline-none cursor-pointer p-1 text-gray-800 hover:bg-gray-100 rounded">
+                <select value={minute} onChange={(e) => handleChange('m', e.target.value)} className="appearance-none bg-transparent font-bold text-center outline-none cursor-pointer p-1 text-gray-800 hover:bg-gray-100 rounded">
                     {minutes.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
             </div>
@@ -136,9 +107,12 @@
         const addTemplate = (template) => {
             let textToAdd = template;
             if (contextData) {
+                // Tạo mã trụ đầy đủ: 478CD + / + 259/4
+                const fullPoleCode = contextData.sub ? `${contextData.code}/${contextData.sub}` : contextData.code;
+                
                 textToAdd = textToAdd
-                    .replace(/{tru}/g, contextData.tru || "...")
-                    .replace(/{tuyen}/g, contextData.tuyen || "...");
+                    .replace(/{tru}/g, fullPoleCode)
+                    .replace(/{tuyen}/g, contextData.line || "...");
             }
             const newValue = value ? value + "\n" + textToAdd : textToAdd;
             onChange(newValue);
@@ -153,77 +127,111 @@
                             <i data-lucide="plus" width="12" height="12"></i> {t.label}
                         </button>
                     ))}
-                    <button onClick={() => onChange("")} className="tag-btn flex-shrink-0 bg-red-50 text-red-600 border-red-200">
-                        Xóa
-                    </button>
+                    <button onClick={() => onChange("")} className="tag-btn flex-shrink-0 bg-red-50 text-red-600 border-red-200">Xóa</button>
                 </div>
-                <textarea 
-                    className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    rows="4"
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                ></textarea>
+                <textarea className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows="4" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}></textarea>
             </div>
         );
     };
 
     // --- COMPONENT CHÍNH ---
     const App = () => {
+        // --- DB STATE ---
+        const [dbPoles, setDbPoles] = useState([]);
+        const [dbCommunes, setDbCommunes] = useState([]);
+        const [dbStaff, setDbStaff] = useState([]);
+        const [dbPositions, setDbPositions] = useState([]);
+        const [dbUnits, setDbUnits] = useState([]);
+
+        // --- FORM DATA ---
         const [formData, setFormData] = useState({
-            // Header
             donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ",
             ngay: new Date().getDate(),
             thang: new Date().getMonth() + 1,
             nam: new Date().getFullYear(),
-            gioKhaoSat: "07:30", // Chuẩn 24h
-            diaDiemKhaoSat: "trụ 478CD/259/4 tuyến 478 Cái Dầu",
+            gioKhaoSat: "07:30",
             
-            // 1. Đơn vị công tác
-            dvct_daiDien1: "Cao Thành Tân", dvct_chucVu1: "CHTT",
+            // Địa điểm
+            loc_poleCode: "478CD", 
+            loc_subCode: "259/4",  
+            loc_lineName: "478 Cái Dầu", 
+            loc_commune: "Thạnh Mỹ Tây", 
+
+            // Nhân sự - ĐỂ TRỐNG
+            dvct_daiDien1: "", dvct_chucVu1: "",
             dvct_daiDien2: "", dvct_chucVu2: "",
-            
-            // 2. Đơn vị QLVH
-            qlvh_daiDien1: "Nguyễn Văn Tâm", qlvh_chucVu1: "TT", qlvh_donVi1: "ĐQLĐCP",
+            qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "",
             qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
-            
-            // 3. Đơn vị liên quan
             dv_lienQuan: "",
 
-            // Nội dung công việc
+            // Nội dung
             muc4_diaDiem: "Tại TBA KDC OLV 1 trụ 478CD/259/4...",
             muc5_noiDung: "Thay điện kế định kỳ",
-            muc6_phamVi: "Tại tủ điện kế trụ 478CD/259/4...",
+            muc6_phamVi: "Tại tủ điện kế trụ 478CD/259/4 tuyến 478 Cái Dầu",
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", muc7_ngay: "2026-01-06",
 
             // 8. Đánh giá rủi ro
-            ruiRo_items: [
-                { moiNguy: "Phóng điện", moTa: "Điện hạ áp giật...", bac: "II", bienPhap: "Thực hiện đúng quy trình an toàn..." },
-                { moiNguy: "Ngã cao", moTa: "Làm việc trên xe gàu...", bac: "II", bienPhap: "Đeo dây an toàn, đội mũ..." }
+            ruiRo_ATLD: [
+                { moiNguy: "Phóng điện", moTa: "Điện hạ áp giật; Ngắn mạch pha - đất; hồ quang điện gây bỏng", bac: "II", bienPhap: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt" },
+                { moiNguy: "Ngã, lật xe", moTa: "Lún chân chống do không chèn chân kỹ", bac: "II", bienPhap: "Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp" },
+                { moiNguy: "Chấn thương đầu, TNGT", moTa: "Dụng cụ rơi rớt trúng người; Xe gây TNGT", bac: "II", bienPhap: "Đặt rào chắn xung quanh vị trí công tác, không cho người và phương tiện di chuyển vào khu vực công tác" },
+                { moiNguy: "Ngã cao", moTa: "Xe bị sự cố hoặc người công nhân không quàng dây an toàn", bac: "II", bienPhap: "Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao trên thùng xe gàu" },
+                { moiNguy: "Sức khỏe, tâm lý", moTa: "Sức khỏe không tốt, tâm lý không ổn định", bac: "II", bienPhap: "Kiểm tra lại sức khỏe của người lao động, ổn định tâm lý của anh em trong nhóm công tác" }
             ],
-            ruiRo_ghiChu: "",
+            ruiRo_VSLD: [
+                { moiNguy: "Say nắng", moTa: "Làm việc trong thời tiết nắng nóng nhiệt độ trên 35 độ", bac: "I", bienPhap: "Tránh làm việc khi thời tiết quá nóng (trên 35 độ C)" }
+            ],
+            ruiRo_ghiChu: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\nSử dụng tấm lót chèn chân chống đảm bảo cứng cáp\nĐặt rào chắn xung quanh vị trí công tác\nTuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\nTránh làm việc khi thời tiết quá nóng",
 
             // 9. Trách nhiệm
             muc9a_catDien: "", 
-            muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ.",
+            muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công, nhân lực thực hiện công việc.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện theo đúng thời gian đăng ký.",
             muc9c_dieuDo: "",
             muc9d_khac: "",
-            
-            // Footer
             soBan: "02"
         });
 
+        // --- FETCH DATA ---
         useEffect(() => {
             lucide.createIcons();
-        });
+            
+            const fetchData = async () => {
+                const { data: poles } = await supabase.from('poles').select('code, line_name');
+                if (poles) setDbPoles(poles); else setDbPoles([{code: "478CD", line_name: "478 Cái Dầu"}]); 
+                
+                const { data: communes } = await supabase.from('communes').select('name');
+                if (communes) setDbCommunes(communes); else setDbCommunes([{name: "Thạnh Mỹ Tây"}, {name: "Mỹ Đức"}]);
 
+                const { data: staffs } = await supabase.from('staff').select('name');
+                if (staffs) setDbStaff(staffs.map(s => s.name)); else setDbStaff(["Cao Thành Tân", "Nguyễn Văn Tâm"]);
+
+                const { data: positions } = await supabase.from('positions').select('name');
+                if (positions) setDbPositions(positions.map(p => p.name)); else setDbPositions(["Chỉ huy trực tiếp", "Giám sát an toàn", "Tổ trưởng", "Kỹ thuật viên", "Công nhân", "Đội trưởng", "Đội phó"]);
+
+                const { data: units } = await supabase.from('units').select('name');
+                if (units) setDbUnits(units.map(u => u.name)); else setDbUnits(["Đội Quản lý điện Châu Phú", "Phòng Kỹ thuật an toàn"]);
+            };
+            fetchData();
+        }, []);
+
+        const handlePoleChange = (e) => {
+            const selectedCode = e.target.value;
+            const found = dbPoles.find(p => p.code === selectedCode);
+            setFormData(prev => ({
+                ...prev,
+                loc_poleCode: selectedCode,
+                loc_lineName: found ? found.line_name : ""
+            }));
+        };
+
+        // --- SỬA LẠI TAGS THEO YÊU CẦU ---
         const tags9a = [
-            { label: "Cắt CB", content: "- Cắt CB trụ {tru}" },
-            { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru}" },
-            { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru}" },
-            { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru}" },
-            { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru}" },
-            { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru}" }
+            { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" },
+            { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" },
+            { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" },
+            { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, // Đã thêm tuyến
+            { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" },
+            { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" }
         ];
 
         const tags9b = [
@@ -232,38 +240,40 @@
             { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." }
         ];
 
-        const handleExport = () => {
-            console.log("Dữ liệu xuất:", formData);
-            alert("Đã lưu dữ liệu! Chức năng xuất file .doc sẽ được xử lý ở server.");
-        };
+        const handleExport = () => { console.log("Dữ liệu xuất:", formData); alert("Đã lưu dữ liệu! Sẵn sàng xuất file."); };
 
-        const updateRiskRow = (index, field, value) => {
-            const newRisks = [...formData.ruiRo_items];
+        const updateRiskRow = (type, index, field, value) => {
+            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
+            const newRisks = [...formData[listKey]];
             newRisks[index][field] = value;
-            setFormData({...formData, ruiRo_items: newRisks});
+            setFormData({...formData, [listKey]: newRisks});
         };
 
-        const addRiskRow = () => {
+        const addRiskRow = (type) => {
+            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
             setFormData({
                 ...formData, 
-                ruiRo_items: [...formData.ruiRo_items, { moiNguy: "", moTa: "", bac: "", bienPhap: "" }]
+                [listKey]: [...formData[listKey], { moiNguy: "", moTa: "", bac: "", bienPhap: "" }]
             });
         };
 
-        const removeRiskRow = (index) => {
-            const newRisks = formData.ruiRo_items.filter((_, i) => i !== index);
-            setFormData({...formData, ruiRo_items: newRisks});
+        const removeRiskRow = (type, index) => {
+            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
+            const newRisks = formData[listKey].filter((_, i) => i !== index);
+            setFormData({...formData, [listKey]: newRisks});
         };
 
+        // Hàm lấy dữ liệu ngữ cảnh cho Quick Input
         const getContextData = () => {
-            const match = formData.diaDiemKhaoSat.match(/trụ\s+([^\s]+)/i);
-            const tru = match ? match[1] : "...";
-            return { tru: tru, tuyen: "..." };
+            return { 
+                code: formData.loc_poleCode, 
+                sub: formData.loc_subCode, 
+                line: formData.loc_lineName 
+            };
         };
 
         return (
             <div className="pb-20">
-                {/* TOOLBAR MOBILE */}
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                     <div className="text-xs text-gray-500">Mẫu 04 - KSHT</div>
                     <button onClick={handleExport} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 active:bg-blue-700">
@@ -272,7 +282,6 @@
                 </div>
 
                 <div className="a4-paper">
-                    
                     {/* HEADER */}
                     <div className="flex justify-between mb-6 text-center text-sm">
                         <div className="w-1/2">
@@ -293,46 +302,81 @@
 
                     <h1 className="text-xl font-bold text-center mb-4 uppercase">BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG</h1>
 
-                    <div className="mb-4 text-justify flex items-center flex-wrap gap-1">
-                        Vào hồi 
-                        {/* Time Select Custom */}
-                        <div className="mx-2">
-                            <TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} />
-                        </div>
-                        tại <input className="input-line w-auto inline-block min-w-[200px] flex-grow" value={formData.diaDiemKhaoSat} onChange={e => setFormData({...formData, diaDiemKhaoSat: e.target.value})} />
+                    {/* VỊ TRÍ KHẢO SÁT */}
+                    <div className="mb-4 text-justify flex flex-wrap items-end gap-1 text-[15px] leading-7">
+                        <span>Vào hồi</span>
+                        <div className="mx-1"><TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} /></div>
+                        
+                        <span>tại trụ</span>
+                        
+                        {/* 1. Mã Trụ: Input List */}
+                        <input list="pole-list" 
+                               className="border-b border-gray-300 font-bold bg-transparent outline-none w-[80px] text-center" 
+                               value={formData.loc_poleCode} 
+                               onChange={handlePoleChange} 
+                               placeholder="Chọn..." />
+                        
+                        <span>/</span>
+                        <input className="border-b border-gray-300 outline-none font-bold w-16 text-center" 
+                               value={formData.loc_subCode} 
+                               onChange={e => setFormData({...formData, loc_subCode: e.target.value})} 
+                               placeholder="..." />
+                        
+                        <span>tuyến</span>
+                        
+                        {/* 3. Tên tuyến: Input List */}
+                        <input list="line-list" 
+                               className="font-bold border-b border-gray-300 min-w-[150px] px-1 text-center text-blue-800 bg-transparent outline-none"
+                               value={formData.loc_lineName}
+                               onChange={e => setFormData({...formData, loc_lineName: e.target.value})}
+                               placeholder="..." />
+                        
+                        <span>, xã</span>
+                        
+                        {/* 4. Xã: Select */}
+                        <select className="border-b border-gray-300 font-bold bg-transparent outline-none min-w-[80px]"
+                                value={formData.loc_commune} 
+                                onChange={e => setFormData({...formData, loc_commune: e.target.value})}>
+                            <option value="">Chọn xã</option>
+                            {dbCommunes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </select>
+                        <span>, tỉnh An Giang.</span>
                     </div>
 
                     <div className="mb-2 font-bold">Chúng tôi gồm:</div>
 
+                    {/* DATALISTS CHO AUTOCOMPLETE */}
+                    <datalist id="pole-list">{dbPoles.map(p => <option key={p.code} value={p.code} />)}</datalist>
+                    {/* Tạo danh sách tuyến duy nhất từ dbPoles để gợi ý */}
+                    <datalist id="line-list">{[...new Set(dbPoles.map(p => p.line_name))].map((l, i) => <option key={i} value={l} />)}</datalist>
+                    <datalist id="staff-list">{dbStaff.map((name, i) => <option key={i} value={name} />)}</datalist>
+                    <datalist id="position-list">{dbPositions.map((pos, i) => <option key={i} value={pos} />)}</datalist>
+                    <datalist id="unit-list">{dbUnits.map((u, i) => <option key={i} value={u} />)}</datalist>
+
                     {/* 1. ĐƠN VỊ CÔNG TÁC */}
                     <div className="mb-4 pl-4">
-                        <div className="font-bold">1. Đại diện đơn vị làm công việc:</div>
+                        <div className="font-bold">1. Đại diện Đơn vị công tác:</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2">
                             {/* 1.1 */}
                             <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
                                 <div className="flex gap-2 items-center">
                                     <span className="font-semibold text-sm">1.1 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Chọn hoặc nhập tên..." />
+                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2 items-center">
                                     <span className="text-sm">Chức vụ:</span>
-                                    <select className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})}>
-                                        {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
+                                    <input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})} placeholder="Chọn..." />
                                 </div>
                             </div>
-                            
                             {/* 1.2 */}
                             <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
                                 <div className="flex gap-2 items-center">
                                     <span className="font-semibold text-sm">1.2 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Chọn hoặc nhập tên..." />
+                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2 items-center">
                                     <span className="text-sm">Chức vụ:</span>
-                                    <select className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})}>
-                                        {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
+                                    <input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})} placeholder="Chọn..." />
                                 </div>
                             </div>
                         </div>
@@ -340,58 +384,32 @@
 
                     {/* 2. ĐƠN VỊ QLVH */}
                     <div className="mb-4 pl-4">
-                        <div className="font-bold">2. Đại diện (các) đơn vị quản lý vận hành:</div>
+                        <div className="font-bold">2. Đại diện (các) Đơn vị QLVH:</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2">
                             {/* 2.1 */}
                             <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
                                 <div className="flex gap-2 items-center">
                                     <span className="font-semibold text-sm">2.1 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Chọn hoặc nhập tên..." />
+                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1">
-                                        <span className="text-sm">CV:</span>
-                                        <select className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})}>
-                                            {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center w-1/2 gap-1">
-                                        <span className="text-sm">ĐV:</span>
-                                        <select className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})}>
-                                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                        </select>
-                                    </div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">CV:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">ĐV:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div>
                                 </div>
                             </div>
-
                             {/* 2.2 */}
                             <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
                                 <div className="flex gap-2 items-center">
                                     <span className="font-semibold text-sm">2.2 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Chọn hoặc nhập tên..." />
+                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." />
                                 </div>
                                 <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1">
-                                        <span className="text-sm">CV:</span>
-                                        <select className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})}>
-                                            {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center w-1/2 gap-1">
-                                        <span className="text-sm">ĐV:</span>
-                                        <select className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})}>
-                                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                        </select>
-                                    </div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">CV:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div>
+                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">ĐV:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* DATALIST CHO TÊN NHÂN VIÊN */}
-                    <datalist id="staff-list">
-                        {STAFF_LIST.map((name, i) => <option key={i} value={name} />)}
-                    </datalist>
 
                     {/* 3. ĐƠN VỊ LIÊN QUAN */}
                     <div className="mb-4 pl-4">
@@ -400,36 +418,24 @@
                     </div>
 
                     <div className="mb-4 italic text-sm text-gray-600">
-                        Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho đơn vị công tác khi tiến hành công việc, cụ thể như sau:
+                        Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:
                     </div>
 
-                    {/* 4, 5, 6, 7. NỘI DUNG CÔNG VIỆC */}
+                    {/* 4-7. NỘI DUNG */}
                     <div className="space-y-3 mb-6">
-                        <div>
-                            <span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span>
-                            <textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea>
-                        </div>
-                        <div>
-                            <span className="font-bold">5. Nội dung công việc:</span>
-                            <input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} />
-                        </div>
-                        <div>
-                            <span className="font-bold">6. Phạm vi làm việc:</span>
-                            <input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} />
-                        </div>
-                        <div>
-                            <span className="font-bold">7. Thời gian tiến hành công việc:</span>
+                        <div><span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span><textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea></div>
+                        <div><span className="font-bold">5. Nội dung công việc:</span><input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} /></div>
+                        <div><span className="font-bold">6. Phạm vi làm việc:</span><input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} /></div>
+                        <div><span className="font-bold">7. Thời gian tiến hành công việc:</span>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                                Từ 
-                                <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianTu} onChange={(val) => setFormData({...formData, muc7_thoiGianTu: val})} /></div>
-                                đến 
-                                <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianDen} onChange={(val) => setFormData({...formData, muc7_thoiGianDen: val})} /></div>
+                                Từ <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianTu} onChange={(val) => setFormData({...formData, muc7_thoiGianTu: val})} /></div>
+                                đến <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianDen} onChange={(val) => setFormData({...formData, muc7_thoiGianDen: val})} /></div>
                                 , ngày <input type="date" className="w-32 border-b border-gray-300 text-center font-bold" value={formData.muc7_ngay} onChange={e => setFormData({...formData, muc7_ngay: e.target.value})} />
                             </div>
                         </div>
                     </div>
 
-                    {/* 8. ĐÁNH GIÁ RỦI RO */}
+                    {/* 8. ĐÁNH GIÁ RỦI RO (Chia 2 phần, canh giữa tiêu đề) */}
                     <div className="mb-6">
                         <div className="font-bold mb-2">8. Kết quả Đánh giá rủi ro của đơn vị công tác:</div>
                         <div className="pl-4">
@@ -447,26 +453,62 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {formData.ruiRo_items.map((item, index) => (
-                                        <tr key={index}>
+                                    {/* PHẦN 1: ATLĐ */}
+                                    <tr>
+                                        <td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">
+                                            ATLĐ (An toàn lao động)
+                                        </td>
+                                    </tr>
+                                    {formData.ruiRo_ATLD.map((item, index) => (
+                                        <tr key={`atld-${index}`}>
                                             <td className="text-center">{index + 1}</td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moiNguy} onChange={(e) => updateRiskRow(index, 'moiNguy', e.target.value)}></textarea></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moTa} onChange={(e) => updateRiskRow(index, 'moTa', e.target.value)}></textarea></td>
-                                            <td><input className="w-full text-center border-none outline-none bg-transparent" value={item.bac} onChange={(e) => updateRiskRow(index, 'bac', e.target.value)} /></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.bienPhap} onChange={(e) => updateRiskRow(index, 'bienPhap', e.target.value)}></textarea></td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moiNguy} onChange={(e) => updateRiskRow('ATLD', index, 'moiNguy', e.target.value)}></textarea></td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moTa} onChange={(e) => updateRiskRow('ATLD', index, 'moTa', e.target.value)}></textarea></td>
+                                            <td><input className="w-full text-center border-none outline-none bg-transparent" value={item.bac} onChange={(e) => updateRiskRow('ATLD', index, 'bac', e.target.value)} /></td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.bienPhap} onChange={(e) => updateRiskRow('ATLD', index, 'bienPhap', e.target.value)}></textarea></td>
                                             <td className="text-center align-middle">
-                                                <button onClick={() => removeRiskRow(index)} className="text-red-500"><i data-lucide="trash-2" width="16"></i></button>
+                                                <button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><i data-lucide="trash-2" width="16"></i></button>
                                             </td>
                                         </tr>
                                     ))}
+                                    <tr>
+                                        <td colSpan="6" className="text-center p-1">
+                                            <button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full">
+                                                <i data-lucide="plus" width="14"></i> Thêm dòng ATLĐ
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    {/* PHẦN 2: VSLĐ */}
+                                    <tr>
+                                        <td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">
+                                            VSLĐ (Vệ sinh lao động)
+                                        </td>
+                                    </tr>
+                                    {formData.ruiRo_VSLD.map((item, index) => (
+                                        <tr key={`vsld-${index}`}>
+                                            <td className="text-center">{index + 1}</td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moiNguy} onChange={(e) => updateRiskRow('VSLD', index, 'moiNguy', e.target.value)}></textarea></td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moTa} onChange={(e) => updateRiskRow('VSLD', index, 'moTa', e.target.value)}></textarea></td>
+                                            <td><input className="w-full text-center border-none outline-none bg-transparent" value={item.bac} onChange={(e) => updateRiskRow('VSLD', index, 'bac', e.target.value)} /></td>
+                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.bienPhap} onChange={(e) => updateRiskRow('VSLD', index, 'bienPhap', e.target.value)}></textarea></td>
+                                            <td className="text-center align-middle">
+                                                <button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><i data-lucide="trash-2" width="16"></i></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    <tr>
+                                        <td colSpan="6" className="text-center p-1">
+                                            <button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full">
+                                                <i data-lucide="plus" width="14"></i> Thêm dòng VSLĐ
+                                            </button>
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
-                            <button onClick={addRiskRow} className="text-sm text-blue-600 font-semibold flex items-center gap-1 mb-4">
-                                <i data-lucide="plus"></i> Thêm dòng rủi ro
-                            </button>
 
                             <div className="font-semibold">b) Ghi chú:</div>
-                            <textarea className="input-line" rows="3" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea>
+                            <textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea>
                         </div>
                     </div>
 
@@ -475,32 +517,10 @@
                         <div className="font-bold mb-2">9. Trách nhiệm của các đơn vị liên quan:</div>
                         <div className="pl-4 space-y-4">
                             
-                            <QuickInputSection 
-                                title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):"
-                                value={formData.muc9a_catDien}
-                                onChange={(val) => setFormData({...formData, muc9a_catDien: val})}
-                                templates={tags9a}
-                                contextData={getContextData()}
-                                placeholder="- Cắt CB..."
-                            />
-
-                            <QuickInputSection 
-                                title="b/ Đối với đơn vị công tác (Biện pháp an toàn):"
-                                value={formData.muc9b_anToan}
-                                onChange={(val) => setFormData({...formData, muc9b_anToan: val})}
-                                templates={tags9b}
-                                placeholder="- Chuẩn bị..."
-                            />
-
-                            <div>
-                                <label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label>
-                                <textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea>
-                            </div>
-
-                            <div>
-                                <label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label>
-                                <textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea>
-                            </div>
+                            <QuickInputSection title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):" value={formData.muc9a_catDien} onChange={(val) => setFormData({...formData, muc9a_catDien: val})} templates={tags9a} contextData={getContextData()} placeholder="- Cắt CB..." />
+                            <QuickInputSection title="b/ Đối với đơn vị công tác (Biện pháp an toàn):" value={formData.muc9b_anToan} onChange={(val) => setFormData({...formData, muc9b_anToan: val})} templates={tags9b} placeholder="- Chuẩn bị..." />
+                            <div><label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label><textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea></div>
+                            <div><label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label><textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea></div>
                         </div>
                     </div>
 
@@ -511,43 +531,22 @@
                     </div>
 
                     <div className="grid grid-cols-2 gap-8 text-center font-bold text-xs md:text-sm uppercase mb-20">
-                        <div>
-                            ĐẠI DIỆN ĐƠN VỊ<br/>LÀM CÔNG VIỆC<br/>
-                            <div className="h-20"></div>
-                            {formData.dvct_daiDien1}
-                        </div>
-                        <div>
-                            ĐẠI DIỆN (CÁC) ĐƠN VỊ<br/>QUẢN LÝ VH<br/>
-                            <div className="h-20"></div>
-                            {formData.qlvh_daiDien1}
-                        </div>
-                        <div>
-                            ĐẠI DIỆN (CÁC)<br/>ĐƠN VỊ ĐIỀU ĐỘ<br/>
-                            <div className="h-20"></div>
-                            {/* Ký tên */}
-                        </div>
-                        <div>
-                            ĐẠI DIỆN CÁC<br/>ĐƠN VỊ LIÊN QUAN<br/>
-                            <div className="h-20"></div>
-                            {/* Ký tên */}
-                        </div>
+                        <div>ĐẠI DIỆN ĐƠN VỊ<br/>LÀM CÔNG VIỆC<br/><div className="h-20"></div>{formData.dvct_daiDien1}</div>
+                        <div>ĐẠI DIỆN (CÁC) ĐƠN VỊ<br/>QUẢN LÝ VH<br/><div className="h-20"></div>{formData.qlvh_daiDien1}</div>
+                        <div>ĐẠI DIỆN (CÁC)<br/>ĐƠN VỊ ĐIỀU ĐỘ<br/><div className="h-20"></div></div>
+                        <div>ĐẠI DIỆN CÁC<br/>ĐƠN VỊ LIÊN QUAN<br/><div className="h-20"></div></div>
                     </div>
 
-                    {/* Placeholder cho Sơ đồ */}
                     <div className="border-t-2 border-dashed pt-4 mt-8">
                         <div className="font-bold text-center mb-4">SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC</div>
                         <div className="h-64 bg-gray-50 border border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
                             <i data-lucide="share-2" width="48" height="48" className="mb-2"></i>
                             <span>(Khu vực hiển thị Sơ đồ một sợi từ module vẽ)</span>
-                            <button className="mt-2 bg-blue-100 text-blue-600 px-4 py-2 rounded text-sm font-semibold hover:bg-blue-200">
-                                Mở Trình Vẽ Sơ Đồ
-                            </button>
+                            <button className="mt-2 bg-blue-100 text-blue-600 px-4 py-2 rounded text-sm font-semibold hover:bg-blue-200">Mở Trình Vẽ Sơ Đồ</button>
                         </div>
                     </div>
-
                 </div>
-                
-                <div className="h-20"></div> {/* Space for fixed footer */}
+                <div className="h-20"></div>
             </div>
         );
     };
