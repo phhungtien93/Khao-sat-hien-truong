@@ -691,13 +691,14 @@
             loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
             qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "", qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
+            qlvh_daiDien3: "", qlvh_chucVu3: "", qlvh_donVi3: "",
             dv_lienQuan: "", muc4_diaDiem: "", muc5_noiDung: "Thay điện kế định kỳ", muc6_phamVi: "",
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", 
             muc7_ngay: getTodayISO(),       // Mặc định ngày hiện tại
             phieu_dgrr_ngay: getTodayISO(), // Mặc định ngày hiện tại
             ruiRo_ATLD: [{ riskId: 1, moiNguy: "Phóng điện", moTa: "Điện hạ áp giật", bac: "II", bienPhap: "Thực hiện biện pháp an toàn..." }],
             ruiRo_VSLD: [{ riskId: null, moiNguy: "", moTa: "", bac: "", bienPhap: "" }],
-            ruiRo_ghiChu: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\nSử dụng tấm lót chèn chân chống đảm bảo cứng cáp\nĐặt rào chắn xung quanh vị trí công tác\nTuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\nTránh làm việc khi thời tiết quá nóng",
+            ruiRo_ghiChu: "- Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\n- Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp\n- Đặt rào chắn xung quanh vị trí công tác\n- Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\n- Tránh làm việc khi thời tiết quá nóng",
             muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị...", muc9c_dieuDo: "", muc9d_khac: "", soBan: "02",
             hinh_anh: [] // Mảng chứa URL ảnh
         };
@@ -774,6 +775,10 @@
 
         // --- HÀM XUẤT WORD (FINAL: TỌA ĐỘ ĐƯỜNG KẺ SÁT + SPACING NGÀY 12PT) ---
         const handleExportDocx = async (targetReport = null) => {
+
+            // Đặt đoạn này ở đầu hàm handleExportDocx
+            const txtDots = (val, dots = 30) => (val && val.trim() !== "") ? val : ".".repeat(dots);
+          
             const sourceForm = targetReport ? targetReport.du_lieu_form : formData;
             const sourceDiagram = targetReport ? targetReport.du_lieu_so_do : diagramData;
             
@@ -921,18 +926,61 @@
                         
                         createPara(`Vào hồi ${sourceForm.gioKhaoSat}, tại trụ ${sourceForm.loc_poleCode}/${sourceForm.loc_subCode} tuyến ${sourceForm.loc_lineName}, xã ${sourceForm.loc_commune}, tỉnh An Giang.`, false, 24, AlignmentType.JUSTIFIED),
                         
-                        createPara("Chúng tôi gồm:", true, 24),
-                        createPara("1. Đại diện Đơn vị công tác:", true, 24), 
-                        createPara(`   1.1 Ông (Bà): ${sourceForm.dvct_daiDien1} - Chức vụ: ${sourceForm.dvct_chucVu1}`, false, 24), 
-                        createPara(`   1.2 Ông (Bà): ${sourceForm.dvct_daiDien2} - Chức vụ: ${sourceForm.dvct_chucVu2}`, false, 24),
+
+
+createPara("Chúng tôi gồm:", true, 24),
                         
-                        createPara("2. Đại diện (các) Đơn vị QLVH:", true, 24), 
-                        createPara(`   2.1 Ông (Bà): ${sourceForm.qlvh_daiDien1} - Chức vụ: ${sourceForm.qlvh_chucVu1} - Đơn vị: ${sourceForm.qlvh_donVi1}`, false, 24), 
-                        createPara(`   2.2 Ông (Bà): ${sourceForm.qlvh_daiDien2} - Chức vụ: ${sourceForm.qlvh_chucVu2} - Đơn vị: ${sourceForm.qlvh_donVi2}`, false, 24),
+                        // --- MỤC 1: ĐƠN VỊ CÔNG TÁC ---
+                        createPara("1. Đại diện Đơn vị công tác:", true, 24),
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} },
+                            rows: [
+                                new TableRow({ children: [
+                                    new TableCell({ children: [createPara(`1.1. Ông (Bà): ${txtDots(sourceForm.dvct_daiDien1, 35)}`, false, 24)], width: { size: 60, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Chức vụ: ${txtDots(sourceForm.dvct_chucVu1, 20)}`, false, 24)], width: { size: 40, type: WidthType.PERCENTAGE } })
+                                ]}),
+                                new TableRow({ children: [
+                                    new TableCell({ children: [createPara(`1.2. Ông (Bà): ${txtDots(sourceForm.dvct_daiDien2, 35)}`, false, 24)], width: { size: 60, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Chức vụ: ${txtDots(sourceForm.dvct_chucVu2, 20)}`, false, 24)], width: { size: 40, type: WidthType.PERCENTAGE } })
+                                ]})
+                            ]
+                        }),
+
+                        // --- MỤC 2: ĐƠN VỊ QLVH (Đã giảm số lượng dấu chấm để không tràn hàng) ---
+                        createPara("2. Đại diện (các) Đơn vị QLVH:", true, 24),
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} },
+                            rows: [
+                                new TableRow({ children: [
+                                    new TableCell({ children: [createPara(`2.1. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien1, 25)}`, false, 24)], width: { size: 45, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Chức vụ: ${txtDots(sourceForm.qlvh_chucVu1, 15)}`, false, 24)], width: { size: 25, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Đơn vị: ${txtDots(sourceForm.qlvh_donVi1, 15)}`, false, 24)], width: { size: 30, type: WidthType.PERCENTAGE } })
+                                ]}),
+                                new TableRow({ children: [
+                                    new TableCell({ children: [createPara(`2.2. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien2, 25)}`, false, 24)], width: { size: 45, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Chức vụ: ${txtDots(sourceForm.qlvh_chucVu2, 15)}`, false, 24)], width: { size: 25, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Đơn vị: ${txtDots(sourceForm.qlvh_donVi2, 15)}`, false, 24)], width: { size: 30, type: WidthType.PERCENTAGE } })
+                                ]}),
+                                new TableRow({ children: [
+                                    new TableCell({ children: [createPara(`2.3. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien3, 25)}`, false, 24)], width: { size: 45, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Chức vụ: ${txtDots(sourceForm.qlvh_chucVu3, 15)}`, false, 24)], width: { size: 25, type: WidthType.PERCENTAGE } }),
+                                    new TableCell({ children: [createPara(`Đơn vị: ${txtDots(sourceForm.qlvh_donVi3, 15)}`, false, 24)], width: { size: 30, type: WidthType.PERCENTAGE } })
+                                ]})
+                            ]
+                        }),
+
+                        // --- MỤC 3: SỬA LỖI IN ĐẬM DẤU CHẤM ---
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "3. Đại diện các đơn vị có liên quan: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: txtDots(sourceForm.dv_lienQuan, 50), bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
                         
-                        createPara(`3. Đại diện các đơn vị có liên quan: ${sourceForm.dv_lienQuan}`, true, 24),
-                        
-                        new Paragraph({ children: [new TextRun({ text: "Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:", italics: true, size: 24, font: "Times New Roman" })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }),
+                        new Paragraph({ children: [new TextRun({ text: "Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:", size: 24, font: "Times New Roman" })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }),
                         
                         // Mục 4
                         new Paragraph({
@@ -1009,41 +1057,73 @@
                         createPara("b) Ghi chú:", true, 24), ...formatMultilineText(sourceForm.ruiRo_ghiChu), createPara("", false, 24),
                         
                         createPara("9. Trách nhiệm của các đơn vị liên quan:", true, 24),
-                        createPara("a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):", false, 24), ...formatMultilineText(sourceForm.muc9a_catDien),
-                        createPara("b/ Đối với đơn vị công tác (Biện pháp an toàn):", false, 24), ...formatMultilineText(sourceForm.muc9b_anToan),
-                        createPara("c/ Đối với (các) đơn vị điều độ:", false, 24), ...formatMultilineText(sourceForm.muc9c_dieuDo),
-                        createPara("d/ Những nội dung khác:", false, 24), ...formatMultilineText(sourceForm.muc9d_khac),
+                        createPara("a/ Đối với (các) đơn vị quản lý vận hành:", true, 24), ...formatMultilineText(sourceForm.muc9a_catDien),
+                        createPara("b/ Đối với đơn vị công tác:", true, 24), ...formatMultilineText(sourceForm.muc9b_anToan),
+                        createPara("c/ Đối với (các) đơn vị điều độ (nếu có):", true, 24), ...formatMultilineText(sourceForm.muc9c_dieuDo),
+                        createPara("d/ Những nội dung khác liên quan đến công việc:", true, 24), ...formatMultilineText(sourceForm.muc9d_khac),
                         createPara("", false, 24),
                         
                         createPara(`Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp thống nhất thông qua.`, false, 24, AlignmentType.JUSTIFIED),
                         createPara("", false, 24),
                         
-                        // Chữ ký
+// --- PHẦN CHỮ KÝ (ĐÃ SỬA: 3 CỘT TRÊN + 1 CỘT DƯỚI) ---
+                        
+                        // HÀNG 1: Đơn vị công tác | Đơn vị QLVH | Đơn vị Điều độ
+                        new Table({ 
+                            width: { size: 100, type: WidthType.PERCENTAGE }, 
+                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} }, 
+                            rows: [ 
+                                // Dòng tiêu đề
+                                new TableRow({ children: [ 
+                                    new TableCell({ children: [createPara("ĐƠN VỊ CÔNG TÁC", true, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara("ĐƠN VỊ QLVH", true, 24, AlignmentType.CENTER)] }),
+                                    new TableCell({ children: [createPara("ĐƠN VỊ ĐIỀU ĐỘ", true, 24, AlignmentType.CENTER)] }) 
+                                ] }), 
+                                // Dòng ký tên
+                                new TableRow({ children: [ 
+                                    // Cột Đơn vị công tác
+                                    new TableCell({ children: [ 
+                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
+                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
+                                        createPara(sourceForm.dvct_daiDien1, true, 24, AlignmentType.CENTER) 
+                                    ] }), 
+                                    // Cột Đơn vị QLVH
+                                    new TableCell({ children: [ 
+                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
+                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
+                                        createPara(sourceForm.qlvh_daiDien1, true, 24, AlignmentType.CENTER) 
+                                    ] }),
+                                    // Cột Đơn vị Điều độ (Luôn hiện dù không có dữ liệu)
+                                    new TableCell({ children: [ 
+                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
+                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
+                                        createPara("", true, 24, AlignmentType.CENTER) 
+                                    ] }) 
+                                ] }) 
+                            ] 
+                        }),
+
+                        // Khoảng cách giữa 2 hàng chữ ký
+                        createPara("", false, 24),
+
+                        // HÀNG 2: Các đơn vị liên quan (Căn giữa phía dưới)
                         new Table({ 
                             width: { size: 100, type: WidthType.PERCENTAGE }, 
                             borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} }, 
                             rows: [ 
                                 new TableRow({ children: [ 
-                                    new TableCell({ children: [createPara("ĐẠI DIỆN ĐƠN VỊ LÀM CÔNG VIỆC", true, 24, AlignmentType.CENTER)] }), 
-                                    new TableCell({ children: [createPara("ĐẠI DIỆN ĐƠN VỊ QLVH", true, 24, AlignmentType.CENTER)] }) 
-                                ] }), 
-                                new TableRow({ children: [ 
                                     new TableCell({ children: [
-                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
-                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
-                                        createPara(sourceForm.dvct_daiDien1, true, 24, AlignmentType.CENTER)
-                                    ] }), 
-                                    new TableCell({ children: [
-                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
-                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
-                                        createPara(sourceForm.qlvh_daiDien1, true, 24, AlignmentType.CENTER)
-                                    ] }) 
+                                        createPara("CÁC ĐƠN VỊ LIÊN QUAN KHÁC", true, 24, AlignmentType.CENTER),
+                                        createPara("", false, 24),
+                                        createPara("", true, 24, AlignmentType.CENTER)
+                                    ] })
                                 ] }) 
                             ] 
                         }),
                         
                         createPara("", false, 24), createPara("", false, 24),
                         createPara("SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC", true, 24, AlignmentType.CENTER),
+                        createPara("(Kèm theo Biên bản khảo sát hiện trường)", false, 24, AlignmentType.CENTER, true),
                         diagramImage ? new Paragraph({ children: [ new window.docx.ImageRun({ data: diagramImage, transformation: { width: imgWidth, height: imgHeight } }) ], alignment: AlignmentType.CENTER }) : createPara("(Chưa có sơ đồ)", false, 24, AlignmentType.CENTER, true)
                     ]
                 }]
@@ -1211,7 +1291,31 @@
                     <div className="mb-2 font-bold">Chúng tôi gồm:</div>
                     <datalist id="pole-list">{dbPoles.map(p => <option key={p.code} value={p.code} />)}</datalist><datalist id="line-list">{[...new Set(dbPoles.map(p => p.line_name))].map((l, i) => <option key={i} value={l} />)}</datalist><datalist id="staff-list">{dbStaff.map((name, i) => <option key={i} value={name} />)}</datalist><datalist id="position-list">{dbPositions.map((pos, i) => <option key={i} value={pos} />)}</datalist><datalist id="unit-list">{dbUnits.map((u, i) => <option key={i} value={u} />)}</datalist>
                     <div className="mb-4 pl-4"><div className="font-bold">1. Đại diện Đơn vị công tác:</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2"><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})} placeholder="Chọn..." /></div></div><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})} placeholder="Chọn..." /></div></div></div></div>
-                    <div className="mb-4 pl-4"><div className="font-bold">2. Đại diện (các) Đơn vị QLVH:</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2"><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div></div></div><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div></div></div></div></div>
+{/* --- MỤC 2: ĐẠI DIỆN QLVH (CẤU TRÚC GRID CŨ - THÊM 2.3) --- */}
+                    <div className="mb-4 pl-4">
+                        <div className="font-bold">2. Đại diện (các) Đơn vị QLVH:</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2">
+                            
+                            {/* Ô 2.1 */}
+                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
+                                <div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập tên..." /></div>
+                                <div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} /></div></div>
+                            </div>
+
+                            {/* Ô 2.2 */}
+                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
+                                <div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập tên..." /></div>
+                                <div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} /></div></div>
+                            </div>
+
+                            {/* Ô 2.3 (MỚI THÊM VÀO GRID) */}
+                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
+                                <div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.3 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien3} onChange={e => setFormData({...formData, qlvh_daiDien3: e.target.value})} placeholder="Nhập tên (nếu có)..." /></div>
+                                <div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu3} onChange={e => setFormData({...formData, qlvh_chucVu3: e.target.value})} /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi3} onChange={e => setFormData({...formData, qlvh_donVi3: e.target.value})} /></div></div>
+                            </div>
+
+                        </div>
+                    </div>
                     <div className="mb-4 pl-4"><div className="font-bold">3. Đại diện các đơn vị có liên quan:</div><textarea className="input-line pl-4 resize-none" rows="2" value={formData.dv_lienQuan} onChange={e => setFormData({...formData, dv_lienQuan: e.target.value})} placeholder="..."></textarea></div>
                     <div className="mb-4 italic text-justify text-black">Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:</div>
                     <div className="space-y-3 mb-6"><div><span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span><textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea></div><div><span className="font-bold">5. Nội dung công việc:</span><input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} /></div><div><span className="font-bold">6. Phạm vi làm việc:</span><input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} /></div>
