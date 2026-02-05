@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Biên Bản KSHT & Sơ Đồ (v2.7 Fix Errors)</title>
+    <title>Biên Bản KSHT (v3.2 - Fix Vẽ Sơ Đồ)</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -29,7 +29,8 @@
         .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .camera-btn { background: #e0f2fe; border: 2px dashed #3b82f6; color: #1d4ed8; transition: all 0.2s; }
         .camera-btn:hover { background: #dbeafe; border-color: #2563eb; }
-        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-zoom-in { animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
 <body>
@@ -38,21 +39,17 @@
 
 <script>
     window.onerror = function(msg, src, line) { 
-        // Bỏ qua lỗi ResizeObserver lành tính
         if(msg.includes("ResizeObserver")) return;
-        document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px"><h2>Đã xảy ra lỗi!</h2><p>Nội dung: ' + msg + '</p><p>Dòng số: ' + line + '</p><p>Vui lòng kiểm tra kết nối mạng hoặc thử tải lại trang (F5).</p></div>'; 
+        document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px"><h2>Lỗi hệ thống!</h2><p>' + msg + '</p><p>Dòng: ' + line + '</p></div>'; 
     };
 </script>
 
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
-    
-    // --- CẤU HÌNH SUPABASE ---
     const supabaseUrl = 'https://wvcjrmcahndwenqnkdim.supabase.co'
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y2pybWNhaG5kd2VucW5rZGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NTI4NjQsImV4cCI6MjA4NDUyODg2NH0.GoacKpBBCut6yhmYUWTLeAdbsGwzJSR2AQJrON5mEvM'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // --- BỘ ICON ---
     const UI_Icons = {
         Save: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
         Plus: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
@@ -67,21 +64,25 @@
         Minus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
         Zap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
         ZapFill: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
-        Square: ({className=""}) => <svg width="18" height="18" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>,
+        Square: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>,
         Type: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>,
         RotateCcw: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>,
         Edit: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
         Grid: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
         ZoomIn: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
         ZoomOut: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
-        Target: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+        Target: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="2"></circle></svg>,
+        Image: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
     };
 
-    // --- MODULE VẼ SƠ ĐỒ ---
+// --- MODULE VẼ SƠ ĐỒ (ĐÃ SỬA LỖI V3.3) ---
     const GRID_SIZE = 5;
     const COLORS = { wire: '#000000', grid: '#e2e8f0', pvlv: '#ef4444', highlight: '#3b82f6', text: '#000000' };
+    
+    // ĐỊNH NGHĨA CSS CLASS (Sửa lỗi ReferenceError)
     const TOOL_BTN_CLASS = "flex flex-col items-center justify-center px-2 py-1 rounded border border-transparent hover:bg-gray-100 min-w-[55px] transition-colors cursor-pointer active:bg-gray-200 touch-manipulation";
     const ACTION_BTN_CLASS = "flex items-center gap-2 border px-3 py-2 rounded-full shadow-md bg-white hover:bg-gray-50 transition-all active:scale-95 cursor-pointer text-sm font-medium whitespace-nowrap touch-manipulation";
+    
     const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
     
     const DiagramEditor = ({ initialData, onSave, onClose }) => {
@@ -111,12 +112,11 @@
         
         const fetchTemplates = async () => {
             setLoadingTemplates(true);
-            try { 
-                const { data, error } = await supabase.from('diagram_templates').select('*').order('created_at', { ascending: false }); 
-                if (!error && data) setTemplates(data);
-                const local = JSON.parse(localStorage.getItem('local_diagram_templates') || '[]');
-                setTemplates(prev => [...local, ...prev]);
-            } catch(e) {}
+            let localTemplates = [];
+            try { const local = localStorage.getItem('local_diagram_templates'); if (local) localTemplates = JSON.parse(local); } catch(e) {}
+            let cloudTemplates = [];
+            try { const { data, error } = await supabase.from('diagram_templates').select('*').order('created_at', { ascending: false }); if (!error && data) cloudTemplates = data; } catch(e) {}
+            setTemplates([...localTemplates, ...cloudTemplates]);
             setLoadingTemplates(false);
         };
         const handleSaveTemplate = async () => {
@@ -126,6 +126,7 @@
                 const local = JSON.parse(localStorage.getItem('local_diagram_templates') || '[]');
                 const localTpl = { ...newTplData, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
                 local.unshift(localTpl); localStorage.setItem('local_diagram_templates', JSON.stringify(local));
+                supabase.from('diagram_templates').insert([newTplData]).then(({ error }) => { if (error) console.warn("Cloud save failed:", error.message); });
                 alert("Đã lưu mẫu thành công!"); fetchTemplates();
             } catch (e) { alert("Lỗi lưu mẫu: " + e.message); }
         };
@@ -175,7 +176,36 @@
                     <div className="flex gap-1 border-r pr-2 shrink-0"><button onClick={() => addObjectToCenter({ id: `ld_${Date.now()}`, type: 'icon_load', subType: 'TBA', label: "TBA..." })} className={TOOL_BTN_CLASS}><div className="text-[10px] font-bold border border-gray-600 rounded px-1 mb-1">TBA</div> <span className="text-[9px] font-semibold">MBA</span></button><button onClick={() => addObjectToCenter({ id: `g_${Date.now()}`, type: 'icon_ground', direction: 'left' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><line x1="2" y1="2" x2="14" y2="14" stroke="black"/><circle cx="2" cy="2" r="1.5"/></svg><span className="text-[9px] font-semibold">TĐ(T)</span></button><button onClick={() => addObjectToCenter({ id: `g_${Date.now()}`, type: 'icon_ground', direction: 'right' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><line x1="14" y1="2" x2="2" y2="14" stroke="black"/><circle cx="14" cy="2" r="1.5"/></svg><span className="text-[9px] font-semibold">TĐ(P)</span></button><button onClick={() => addObjectToCenter({ id: `glv_${Date.now()}`, type: 'icon_ground_lv', direction: 'left' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><circle cx="12" cy="2" r="1.5" fill="black"/><line x1="12" y1="2" x2="6" y2="8" stroke="black" strokeWidth="1.5"/><line x1="2" y1="8" x2="10" y2="8" stroke="black" strokeWidth="1.5"/><line x1="4" y1="11" x2="8" y2="11" stroke="black" strokeWidth="1.5"/></svg><span className="text-[9px] font-semibold">HT(T)</span></button><button onClick={() => addObjectToCenter({ id: `glv_${Date.now()}`, type: 'icon_ground_lv', direction: 'right' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><circle cx="2" cy="2" r="1.5" fill="black"/><line x1="2" y1="2" x2="8" y2="8" stroke="black" strokeWidth="1.5"/><line x1="4" y1="8" x2="12" y2="8" stroke="black" strokeWidth="1.5"/><line x1="6" y1="11" x2="10" y2="11" stroke="black" strokeWidth="1.5"/></svg><span className="text-[9px] font-semibold">HT(P)</span></button></div>
                     <div className="flex gap-1 shrink-0"><button onClick={() => addObjectToCenter({ id: `p_${Date.now()}`, type: 'rect_pvlv', width: 120, height: 100 })} className={TOOL_BTN_CLASS}><UI_Icons.Square className="text-red-500" strokeWidth="2" strokeDasharray="2 2" /> <span className="text-[9px] mt-1 font-semibold">PVLV</span></button><button onClick={() => addObjectToCenter({ id: `t_${Date.now()}`, type: 'text', text: "Ghi chú...", fontSize: 14, rotate: 0 })} className={TOOL_BTN_CLASS}><UI_Icons.Type /> <span className="text-[9px] mt-1 font-semibold">Chữ</span></button></div>
                 </div>
-                <div className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} style={{ cursor: isPanning ? 'grabbing' : 'default' }}><svg width="100%" height="100%" style={{backgroundColor: 'white'}}><defs><pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse" patternTransform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}><path d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`} fill="none" stroke={COLORS.grid} strokeWidth="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" />{objects.map(obj => {const isSelected = obj.id === selectedId;if (obj.type === 'line') return (<g key={obj.id} data-id={obj.id} data-type="object"><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} pointerEvents="none" /><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="transparent" strokeWidth="20" data-id={obj.id} data-type="object" />{isSelected && <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}{isSelected && <circle cx={obj.x1} cy={obj.y1} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="start" />}{isSelected && <circle cx={obj.x2} cy={obj.y2} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="end" />}</g>); if (obj.type === 'circle') return (<circle key={obj.id} cx={obj.cx} cy={obj.cy} r={isSelected ? 6 : 4} fill={isSelected ? COLORS.highlight : "black"} data-id={obj.id} data-type="object" />); if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-20" y="-20" width="40" height="40" fill="transparent" data-id={obj.id} data-type="object"/>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO' ? "black" : "none"} /></g>) : (<g pointerEvents="none" stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-22" y="-22" width="44" height="44" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); if (obj.type === 'icon_load') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="50" fill="transparent" data-id={obj.id} data-type="object"/>{obj.subType === 'TBA' ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><circle cx="0" cy="0" r="18" fill="white"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" strokeWidth="2"/></g>) : (<rect pointerEvents="none" x="-18" y="-25" width="36" height="50" fill="white" stroke="black" strokeWidth="2"/>)}<text x="25" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-28" y="-28" width="56" height="56" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); if (obj.type === 'icon_ground') {const dx = obj.direction === 'left' ? -20 : 20, dy = -20;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="35" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none"><line x1={dx} y1={dy} x2="0" y2="0" stroke="black" strokeWidth="2"/><circle cx={dx} cy={dy} r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" strokeWidth="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" strokeWidth="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" strokeWidth="2"/></g>{isSelected && <rect x="-25" y="-25" width="50" height="35" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>);} if (obj.type === 'icon_ground_lv') {const isLeft = obj.direction === 'left';const barX = isLeft ? -10 : 10;const barY = 10;const rectX = isLeft ? -20 : 0;const rectY = 0;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x={rectX} y={rectY} width="20" height="20" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none" stroke="black" strokeWidth="1.5"><circle cx="0" cy="0" r="2" fill="black" stroke="none" /><line x1="0" y1="0" x2={barX} y2={10}/><line x1={barX - 8} y1={10} x2={barX + 8} y2={10}/><line x1={barX - 5} y1={barY + 3} x2={barX + 5} y2={13}/><line x1={barX - 2} y1={barY + 6} x2={barX + 2} y2={16}/></g>{isSelected && <rect x={rectX} y={rectY} width="20" height="20" fill="none" stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}</g>);} if (obj.type === 'text') return (<text key={obj.id} x={obj.x} y={obj.y} fontSize={obj.fontSize} fill={isSelected ? COLORS.highlight : "black"} transform={`rotate(${obj.rotate || 0}, ${obj.x}, ${obj.y})`} style={{fontWeight: isSelected ? 'bold' : 'normal'}} data-id={obj.id} data-type="object">{obj.text}</text>); if (obj.type === 'rect_pvlv') return <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect width={obj.width} height={obj.height} fill="rgba(239, 68, 68, 0.05)" stroke={COLORS.pvlv} strokeWidth="2" strokeDasharray="5 5" data-id={obj.id} data-type="object"/><text x="5" y="15" fill={COLORS.pvlv} fontSize="10" fontWeight="bold" pointerEvents="none">PVLV</text>{isSelected && <rect x={obj.width - 20} y={obj.height - 20} width="20" height="20" fill="white" stroke={COLORS.highlight} strokeWidth="2" data-id={obj.id} data-type="object" data-handle="se" />}</g>; return null; })}</svg><div className="absolute top-4 right-4 flex flex-col gap-3"><button onClick={() => setViewport({ x: 0, y: 0, scale: 1 })} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100" title="Về giữa"><UI_Icons.Target/></button><button onClick={() => setViewport(prev => ({ ...prev, scale: Math.min(prev.scale * 1.2, 3) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomIn/></button><button onClick={() => setViewport(prev => ({ ...prev, scale: Math.max(prev.scale / 1.2, 0.5) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomOut/></button></div></div>
+                <div className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} style={{ cursor: isPanning ? 'grabbing' : 'default' }}>
+                    <svg width="100%" height="100%" style={{backgroundColor: 'white'}}>
+                        <defs>
+                            <pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse" patternTransform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
+                                <path d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`} fill="none" stroke={COLORS.grid} strokeWidth="0.5"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#grid)" />
+                        <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}>
+                            {objects.map(obj => {
+                                const isSelected = obj.id === selectedId;
+                                // SỬA LỖI stroke-width THÀNH strokeWidth
+                                if (obj.type === 'line') return (<g key={obj.id} data-id={obj.id} data-type="object"><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} pointerEvents="none" /><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="transparent" strokeWidth="20" data-id={obj.id} data-type="object" />{isSelected && <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}{isSelected && <circle cx={obj.x1} cy={obj.y1} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="start" />}{isSelected && <circle cx={obj.x2} cy={obj.y2} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="end" />}</g>); 
+                                if (obj.type === 'circle') return (<circle key={obj.id} cx={obj.cx} cy={obj.cy} r={isSelected ? 6 : 4} fill={isSelected ? COLORS.highlight : "black"} data-id={obj.id} data-type="object" />); 
+                                if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-20" y="-20" width="40" height="40" fill="transparent" data-id={obj.id} data-type="object"/>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO' ? "black" : "none"} /></g>) : (<g pointerEvents="none" stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-22" y="-22" width="44" height="44" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); 
+                                if (obj.type === 'icon_load') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="50" fill="transparent" data-id={obj.id} data-type="object"/>{obj.subType === 'TBA' ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><circle cx="0" cy="0" r="18" fill="white"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" strokeWidth="2"/></g>) : (<rect pointerEvents="none" x="-18" y="-25" width="36" height="50" fill="white" stroke="black" strokeWidth="2"/>)}<text x="25" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-28" y="-28" width="56" height="56" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); 
+                                if (obj.type === 'icon_ground') {const dx = obj.direction === 'left' ? -20 : 20, dy = -20;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="35" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none"><line x1={dx} y1={dy} x2="0" y2="0" stroke="black" strokeWidth="2"/><circle cx={dx} cy={dy} r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" strokeWidth="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" strokeWidth="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" strokeWidth="2"/></g>{isSelected && <rect x="-25" y="-25" width="50" height="35" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>);} 
+                                if (obj.type === 'icon_ground_lv') {const isLeft = obj.direction === 'left';const barX = isLeft ? -10 : 10;const barY = 10;const rectX = isLeft ? -20 : 0;const rectY = 0;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x={rectX} y={rectY} width="20" height="20" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none" stroke="black" strokeWidth="1.5"><circle cx="0" cy="0" r="2" fill="black" stroke="none" /><line x1="0" y1="0" x2={barX} y2={10}/><line x1={barX - 8} y1={10} x2={barX + 8} y2={10}/><line x1={barX - 5} y1={barY + 3} x2={barX + 5} y2={13}/><line x1={barX - 2} y1={barY + 6} x2={barX + 2} y2={16}/></g>{isSelected && <rect x={rectX} y={rectY} width="20" height="20" fill="none" stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}</g>);} 
+                                if (obj.type === 'text') return (<text key={obj.id} x={obj.x} y={obj.y} fontSize={obj.fontSize} fill={isSelected ? COLORS.highlight : "black"} transform={`rotate(${obj.rotate || 0}, ${obj.x}, ${obj.y})`} style={{fontWeight: isSelected ? 'bold' : 'normal'}} data-id={obj.id} data-type="object">{obj.text}</text>); 
+                                if (obj.type === 'rect_pvlv') return <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect width={obj.width} height={obj.height} fill="rgba(239, 68, 68, 0.05)" stroke={COLORS.pvlv} strokeWidth="2" strokeDasharray="5 5" data-id={obj.id} data-type="object"/><text x="5" y="15" fill={COLORS.pvlv} fontSize="10" fontWeight="bold" pointerEvents="none">PVLV</text>{isSelected && <rect x={obj.width - 20} y={obj.height - 20} width="20" height="20" fill="white" stroke={COLORS.highlight} strokeWidth="2" data-id={obj.id} data-type="object" data-handle="se" />}</g>; 
+                                return null; 
+                            })}
+                        </g>
+                    </svg>
+                    <div className="absolute top-4 right-4 flex flex-col gap-3">
+                        <button onClick={() => setViewport({ x: 0, y: 0, scale: 1 })} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100" title="Về giữa"><UI_Icons.Target/></button>
+                        <button onClick={() => setViewport(prev => ({ ...prev, scale: Math.min(prev.scale * 1.2, 3) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomIn/></button>
+                        <button onClick={() => setViewport(prev => ({ ...prev, scale: Math.max(prev.scale / 1.2, 0.5) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomOut/></button>
+                    </div>
+                </div>
                 {selectedId && (<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-4 py-3 rounded-full shadow-2xl border border-gray-200 flex items-center gap-3 animate-slide-up z-50 overflow-x-auto max-w-[90%] no-scrollbar">{['text', 'icon_device', 'icon_load'].includes(objects.find(o => o.id === selectedId)?.type) && (<button onClick={() => { const obj = objects.find(o => o.id === selectedId); const next = prompt("Nhập nội dung mới:", obj.type === 'text' ? obj.text : obj.label); if (next !== null) setObjects(prev => prev.map(o => o.id === selectedId ? (o.type === 'text' ? { ...o, text: next } : { ...o, label: next }) : o)); }} className={ACTION_BTN_CLASS + " text-orange-600 border-orange-200"}><UI_Icons.Edit/> Sửa</button>)}{(objects.find(o => o.id === selectedId)?.type === 'text' || objects.find(o => o.id === selectedId)?.type === 'line') && (<button onClick={() => setObjects(prev => prev.map(o => { if (o.id !== selectedId) return o; if (o.type === 'line') { const mx = (o.x1+o.x2)/2, my = (o.y1+o.y2)/2, dx = o.x1-mx, dy = o.y1-my; return { ...o, x1: snapToGrid(mx-dy), y1: snapToGrid(my+dx), x2: snapToGrid(mx+dy), y2: snapToGrid(my-dx) }; } return o.type === 'text' ? { ...o, rotate: o.rotate === 0 ? -90 : 0 } : o; }))} className={ACTION_BTN_CLASS + " text-purple-600 border-purple-200"}><UI_Icons.RotateCcw/> Xoay</button>)}{objects.find(o => o.id === selectedId)?.type === 'line' && (<button onClick={() => setObjects(prev => prev.map(o => o.id === selectedId && o.type === 'line' ? { ...o, dash: !o.dash } : o))} className={ACTION_BTN_CLASS + " text-blue-600 border-blue-200"}><UI_Icons.Minus/> Đứt/Liền</button>)}<div className="w-[1px] h-6 bg-gray-300 mx-1"></div><button onClick={() => { setObjects(objects.filter(o => o.id !== selectedId)); setSelectedId(null); }} className={ACTION_BTN_CLASS + " text-red-600 border-red-200 bg-red-50"}><UI_Icons.Trash2/> Xóa</button><button onClick={() => setSelectedId(null)} className="p-2 text-gray-400 hover:text-gray-600"><UI_Icons.X /></button></div>)}
             </div>
         );
@@ -189,6 +219,7 @@
         return (
             <svg width="100%" height="100%" viewBox={`${minX} ${minY} ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
                  {objects.map(obj => {
+                    // SỬA LỖI stroke-width THÀNH strokeWidth TRONG PREVIEW LUÔN
                     if (obj.type === 'line') return <line key={obj.id} x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} />;
                     if (obj.type === 'circle') return <circle key={obj.id} cx={obj.cx} cy={obj.cy} r={4} fill="black" />;
                     if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO'?"black":"none"}/></g>) : (<g stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold">{obj.label}</text></g>);
@@ -244,6 +275,36 @@
                     <button onClick={() => onChange("")} className="tag-btn flex-shrink-0 bg-red-50 text-red-600 border-red-200">Xóa</button>
                 </div>
                 <textarea className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows="4" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}></textarea>
+            </div>
+        );
+    };
+
+    // --- MODAL XEM ẢNH (QUẢN LÝ) ---
+    const ImageGalleryModal = ({ images, onClose, onZoom }) => {
+        if (!images) return null;
+        return (
+            <div className="fixed inset-0 z-[10000] bg-black/90 flex flex-col" onClick={onClose}>
+                <div className="p-4 flex justify-between items-center text-white shrink-0 bg-black/50 backdrop-blur-sm">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><UI_Icons.Share2/> Hình ảnh hiện trường ({images.length})</h3>
+                    <button onClick={onClose} className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"><UI_Icons.X/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-4 gap-4 content-start">
+                    {images.length === 0 ? (
+                        <div className="col-span-full text-center text-gray-500 mt-20 flex flex-col items-center">
+                            <UI_Icons.Share2 size={48} className="mb-2 opacity-50"/>
+                            <span>Không có hình ảnh nào</span>
+                        </div>
+                    ) : (
+                        images.map((url, i) => (
+                            <div key={i} className="relative rounded-lg overflow-hidden border border-gray-700 aspect-square group cursor-pointer" onClick={(e) => { e.stopPropagation(); onZoom(url); }}>
+                                <img src={url} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" alt="Evidence" loading="lazy"/>
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2 pointer-events-none">
+                                    <div className="text-white text-xs font-bold flex items-center gap-1"><UI_Icons.ZoomIn size={16}/> Xem to</div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
         );
     };
@@ -315,12 +376,13 @@
     };
 
     // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (FINAL) ---
-    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport }) => {
+    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom }) => {
         const [reports, setReports] = useState([]);
         const [loading, setLoading] = useState(false);
         const [filterDate, setFilterDate] = useState(""); 
         const [filterCode, setFilterCode] = useState("");
         const [downloadedIds, setDownloadedIds] = useState([]);
+        const [previewImages, setPreviewImages] = useState(null); // State xem ảnh
 
         useEffect(() => {
             const updateDownloadedStatus = () => {
@@ -389,6 +451,9 @@
 
         return (
             <div className="fixed inset-0 bg-gray-100 z-[9999] flex flex-col overflow-hidden" style={{ margin: 0, padding: 0 }}>
+                {/* MODAL XEM ẢNH TRONG LIST */}
+                <ImageGalleryModal images={previewImages} onClose={() => setPreviewImages(null)} onZoom={onZoom} />
+
                 {/* HEADER */}
                 <div className="bg-white border-b px-3 py-2 shadow-sm flex items-center justify-between shrink-0 h-14 relative z-20">
                     <h2 className="text-base font-bold text-blue-800 uppercase flex items-center gap-2">
@@ -425,6 +490,10 @@
                                     {reports.map(r => {
                                         const isDownloaded = downloadedIds.includes(r.id);
                                         const btnClass = isDownloaded ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-green-700 hover:border-green-300";
+                                        
+                                        // Kiểm tra số lượng ảnh
+                                        const imgCount = r.du_lieu_form?.hinh_anh ? r.du_lieu_form.hinh_anh.length : 0;
+
                                         return (
                                             <div key={r.id} className="px-3 py-2.5 hover:bg-blue-50 transition-colors group cursor-default">
                                                 <div className="flex items-center justify-between gap-2">
@@ -437,6 +506,15 @@
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0 self-center">
+                                                        {/* Nút Xem Ảnh (MỚI) */}
+                                                        {imgCount > 0 ? (
+                                                            <button onClick={() => setPreviewImages(r.du_lieu_form.hinh_anh)} className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm" title="Xem ảnh hiện trường">
+                                                                <UI_Icons.Share2 size={14}/> {imgCount}
+                                                            </button>
+                                                        ) : (
+                                                            <button className="p-1.5 text-gray-300 cursor-not-allowed" title="Không có ảnh"><UI_Icons.Share2 size={16}/></button>
+                                                        )}
+
                                                         <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
                                                         <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-2.5 py-1.5 border rounded text-[11px] font-bold active:scale-95 transition-all shadow-sm ${btnClass}`}><UI_Icons.Download size={14}/> Word</button>
                                                         <button onClick={(e) => handleDelete(r.id, e)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded ml-1 transition-colors active:scale-95"><UI_Icons.Trash2 size={18}/></button>
@@ -502,6 +580,8 @@
         
         // Khởi tạo form với dữ liệu mặc định copy
         const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
+        // State Zoom Ảnh
+        const [zoomImage, setZoomImage] = useState(null);
 
         const fetchRiskLibrary = async () => {
             const { data: risks } = await supabase.from('dm_moi_nguy').select('*');
@@ -934,9 +1014,35 @@
 
         return (
             <div className="pb-20">
+                {/* --- MODAL PHÓNG TO ẢNH (MỚI - TOÀN MÀN HÌNH ĐEN) --- */}
+                {zoomImage && (
+                    <div className="fixed inset-0 z-[99999] bg-black flex flex-col items-center justify-center animate-zoom-in" onClick={() => setZoomImage(null)}>
+                        {/* Toolbar trên cùng */}
+                        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent z-[99999] text-white">
+                            <span className="text-sm font-medium opacity-70">Chạm vào nền để đóng</span>
+                            <div className="flex gap-4">
+                                <a href={zoomImage} target="_blank" className="flex items-center gap-1 font-bold text-blue-300 hover:text-white border border-blue-300 rounded px-3 py-1.5 text-xs bg-black/50 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
+                                    <UI_Icons.Share2 size={16}/> Mở Ảnh Gốc (Zoom nét)
+                                </a>
+                                <button onClick={() => setZoomImage(null)} className="bg-white/20 rounded-full p-2 hover:bg-red-500 transition-colors backdrop-blur-md"><UI_Icons.X size={24}/></button>
+                            </div>
+                        </div>
+                        
+                        {/* Ảnh hiển thị full không padding, giữ nguyên tỉ lệ */}
+                        <div className="w-full h-full flex items-center justify-center p-0 m-0 overflow-hidden">
+                            <img 
+                                src={zoomImage} 
+                                className="max-w-full max-h-full object-contain" 
+                                alt="Zoom View" 
+                                onClick={(e) => e.stopPropagation()} // Bấm vào ảnh ko bị đóng
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {showDiagram && <DiagramEditor initialData={diagramData} onSave={(data) => setDiagramData(data)} onClose={() => setShowDiagram(false)} />}
                 <RiskSelectModal isOpen={modalConfig.isOpen} onClose={() => setModalConfig({...modalConfig, isOpen: false})} title={modalConfig.title} options={modalConfig.options} selectedValues={modalConfig.currentValue} onSave={saveModalSelection} />
-                <ReportListPage isOpen={showReportList} onCreateNew={handleCreateNew} onLoad={handleLoadReport} onExport={handleExportDocx} />
+                <ReportListPage isOpen={showReportList} onCreateNew={handleCreateNew} onLoad={handleLoadReport} onExport={handleExportDocx} onZoom={(url) => setZoomImage(url)} />
                 <RiskManagerModal isOpen={showRiskManager} onClose={() => setShowRiskManager(false)} onRefresh={fetchRiskLibrary} existingRisks={riskLibrary.risks} />
 
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
@@ -989,9 +1095,10 @@
                         ) : (
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {formData.hinh_anh.map((url, index) => (
-                                    <div key={index} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-300 shadow-sm">
-                                        <img src={url} alt={`Ảnh ${index+1}`} className="w-full h-full object-cover" />
-                                        <button onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 shadow-md"><UI_Icons.X size={14}/></button>
+                                    <div key={index} className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-300 shadow-sm cursor-zoom-in" onClick={() => setZoomImage(url)}>
+                                        <img src={url} alt={`Ảnh ${index+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                        {/* Nút xóa (cần stopPropagation để không bị kích hoạt zoom khi bấm xóa) */}
+                                        <button onClick={(e) => { e.stopPropagation(); removeImage(index); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 shadow-md transition-opacity"><UI_Icons.X size={14}/></button>
                                     </div>
                                 ))}
                             </div>
