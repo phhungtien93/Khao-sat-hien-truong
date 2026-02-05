@@ -85,6 +85,7 @@
     
     const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
     
+// --- COMPONENT TRÌNH VẼ SƠ ĐỒ (ĐÃ SỬA: TỰ ĐỘNG CĂN GIỮA TRÊN MOBILE) ---
     const DiagramEditor = ({ initialData, onSave, onClose }) => {
         const [objects, setObjects] = useState(initialData || []);
         const [selectedId, setSelectedId] = useState(null);
@@ -95,18 +96,79 @@
         const [isPanning, setIsPanning] = useState(false);
         const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
         const [dragState, setDragState] = useState({ isDragging: false, draggedId: null, startX: 0, startY: 0, initialObj: null, type: 'move', handle: null });
-        
+
+        // --- HÀM MỚI: TỰ ĐỘNG CĂN GIỮA & CO GIÃN (AUTO FIT) ---
+        const fitToScreen = (items) => {
+            if (!items || items.length === 0) {
+                // Nếu không có hình, về giữa màn hình
+                setViewport({ x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 1 });
+                return;
+            }
+
+            // 1. Tìm biên (bounds) của tất cả hình vẽ
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            
+            items.forEach(obj => {
+                if (obj.type === 'line') {
+                    minX = Math.min(minX, obj.x1, obj.x2); maxX = Math.max(maxX, obj.x1, obj.x2);
+                    minY = Math.min(minY, obj.y1, obj.y2); maxY = Math.max(maxY, obj.y1, obj.y2);
+                } else if (obj.type === 'rect_pvlv') {
+                    minX = Math.min(minX, obj.x); maxX = Math.max(maxX, obj.x + obj.width);
+                    minY = Math.min(minY, obj.y); maxY = Math.max(maxY, obj.y + obj.height);
+                } else {
+                    // Các icon, text, circle (tâm cx, cy hoặc x, y)
+                    const x = obj.x !== undefined ? obj.x : obj.cx;
+                    const y = obj.y !== undefined ? obj.y : obj.cy;
+                    const size = 40; // Kích thước ước lượng
+                    minX = Math.min(minX, x - size); maxX = Math.max(maxX, x + size);
+                    minY = Math.min(minY, y - size); maxY = Math.max(maxY, y + size);
+                }
+            });
+
+            // 2. Tính toán tỷ lệ zoom và vị trí
+            const padding = 40; // Khoảng cách lề
+            const contentWidth = maxX - minX + padding * 2;
+            const contentHeight = maxY - minY + padding * 2;
+            
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight - 100; // Trừ hao thanh công cụ
+            
+            // Tính scale sao cho vừa khít
+            let newScale = Math.min(screenW / contentWidth, screenH / contentHeight);
+            newScale = Math.min(newScale, 1.2); // Không zoom quá to (max 1.2)
+            newScale = Math.max(newScale, 0.3); // Không quá nhỏ
+            
+            // Tính toán vị trí để đưa về giữa màn hình
+            const contentCenterX = (minX + maxX) / 2;
+            const contentCenterY = (minY + maxY) / 2;
+            
+            const newX = (screenW / 2) - (contentCenterX * newScale);
+            const newY = (screenH / 2) - (contentCenterY * newScale);
+
+            setViewport({ x: newX, y: newY, scale: newScale });
+        };
+
+        // Khi mở lên, nếu có dữ liệu cũ -> Tự động Fit
         useEffect(() => {
-            if (!initialData || initialData.length === 0) {
-                   const cx = snapToGrid(window.innerWidth / 2); const cy = 200;
-                   setObjects([
-                        { id: 'line_src', type: 'line', x1: cx - 100, y1: cy, x2: cx + 100, y2: cy, strokeWidth: 2, dash: false },
-                        { id: 'txt_src', type: 'text', x: cx - 90, y: cy - 20, text: "Tuyến 475", fontSize: 14, rotate: 0 },
-                        { id: 'dev_fco', type: 'icon_device', subType: 'FCO', x: cx, y: cy + 80, label: "03FCO" },
-                        { id: 'line_br', type: 'line', x1: cx, y1: cy, x2: cx, y2: cy + 200, strokeWidth: 2, dash: false },
-                        { id: 'junc', type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' },
-                        { id: 'load', type: 'icon_load', subType: 'TBA', x: cx, y: cy + 200, label: "TBA 250kVA" }
-                   ]);
+            if (initialData && initialData.length > 0) {
+                // Delay nhẹ để DOM render xong mới tính toán chuẩn kích thước màn hình
+                setTimeout(() => fitToScreen(initialData), 50);
+            } else {
+                // Nếu tạo mới, đặt tâm ở giữa màn hình
+                const cx = snapToGrid(window.innerWidth / 2);
+                const cy = snapToGrid(window.innerHeight / 2 - 50);
+                
+                // Tạo mẫu mặc định nằm ngay giữa
+                setObjects([
+                    { id: 'line_src', type: 'line', x1: cx - 80, y1: cy, x2: cx + 80, y2: cy, strokeWidth: 2, dash: false },
+                    { id: 'txt_src', type: 'text', x: cx, y: cy - 20, text: "Tuyến...", fontSize: 14, rotate: 0 },
+                    { id: 'dev_fco', type: 'icon_device', subType: 'FCO', x: cx, y: cy + 60, label: "FCO" },
+                    { id: 'line_br', type: 'line', x1: cx, y1: cy, x2: cx, y2: cy + 150, strokeWidth: 2, dash: false },
+                    { id: 'junc', type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' },
+                    { id: 'load', type: 'icon_load', subType: 'TBA', x: cx, y: cy + 150, label: "TBA..." }
+               ]);
+               // Reset viewport về 0,0 (vì đã tính tọa độ cx, cy theo màn hình rồi)
+               setViewport({ x: 0, y: 0, scale: 1 });
             }
         }, []);
         
@@ -137,7 +199,17 @@
                 localStorage.setItem('local_diagram_templates', JSON.stringify(local.filter(t => t.id !== id))); fetchTemplates();
             } else { await supabase.from('diagram_templates').delete().eq('id', id); fetchTemplates(); }
         };
-        const handleLoadTemplate = (tpl) => { if(confirm(`Dùng mẫu "${tpl.name}"?`)) { setObjects(tpl.data); setShowTemplateModal(false); } };
+        
+        // --- CẬP NHẬT HÀM LOAD MẪU: Gọi fitToScreen ---
+        const handleLoadTemplate = (tpl) => { 
+            if(confirm(`Dùng mẫu "${tpl.name}"?`)) { 
+                setObjects(tpl.data); 
+                setShowTemplateModal(false);
+                // Tự động căn giữa sau khi load
+                setTimeout(() => fitToScreen(tpl.data), 50);
+            } 
+        };
+
         const openTemplateModal = () => { setShowTemplateModal(true); fetchTemplates(); };
         const screenToWorld = (screenX, screenY) => ({ x: (screenX - viewport.x) / viewport.scale, y: (screenY - viewport.y) / viewport.scale });
         
@@ -187,7 +259,6 @@
                         <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}>
                             {objects.map(obj => {
                                 const isSelected = obj.id === selectedId;
-                                // SỬA LỖI stroke-width THÀNH strokeWidth
                                 if (obj.type === 'line') return (<g key={obj.id} data-id={obj.id} data-type="object"><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} pointerEvents="none" /><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="transparent" strokeWidth="20" data-id={obj.id} data-type="object" />{isSelected && <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}{isSelected && <circle cx={obj.x1} cy={obj.y1} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="start" />}{isSelected && <circle cx={obj.x2} cy={obj.y2} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="end" />}</g>); 
                                 if (obj.type === 'circle') return (<circle key={obj.id} cx={obj.cx} cy={obj.cy} r={isSelected ? 6 : 4} fill={isSelected ? COLORS.highlight : "black"} data-id={obj.id} data-type="object" />); 
                                 if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-20" y="-20" width="40" height="40" fill="transparent" data-id={obj.id} data-type="object"/>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO' ? "black" : "none"} /></g>) : (<g pointerEvents="none" stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-22" y="-22" width="44" height="44" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); 
@@ -201,7 +272,7 @@
                         </g>
                     </svg>
                     <div className="absolute top-4 right-4 flex flex-col gap-3">
-                        <button onClick={() => setViewport({ x: 0, y: 0, scale: 1 })} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100" title="Về giữa"><UI_Icons.Target/></button>
+                        <button onClick={() => fitToScreen(objects)} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100" title="Về giữa"><UI_Icons.Target/></button>
                         <button onClick={() => setViewport(prev => ({ ...prev, scale: Math.min(prev.scale * 1.2, 3) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomIn/></button>
                         <button onClick={() => setViewport(prev => ({ ...prev, scale: Math.max(prev.scale / 1.2, 0.5) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomOut/></button>
                     </div>
