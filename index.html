@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Biên Bản KSHT (v3.2 - Fix Vẽ Sơ Đồ)</title>
+    <title>Khảo Sát Hiện Trường Ver 3.6</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -49,6 +49,29 @@
     const supabaseUrl = 'https://wvcjrmcahndwenqnkdim.supabase.co'
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y2pybWNhaG5kd2VucW5rZGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NTI4NjQsImV4cCI6MjA4NDUyODg2NH0.GoacKpBBCut6yhmYUWTLeAdbsGwzJSR2AQJrON5mEvM'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// --- COMPONENT ĐĂNG NHẬP ---
+    const LoginScreen = ({ onLogin, loading }) => {
+        const [user, setUser] = useState("");
+        const [pass, setPass] = useState("");
+        const handleEnter = (e) => { if(e.key === 'Enter') onLogin(user, pass); };
+
+        return (
+            <div className="fixed inset-0 bg-gray-100 flex flex-col items-center justify-center z-[9999]">
+                <div className="bg-white p-8 rounded-xl shadow-xl w-80 border">
+                    <h2 className="text-xl font-bold text-center mb-6 text-blue-800 uppercase">Đăng Nhập</h2>
+                    <div className="space-y-4">
+                        <input className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Tên đăng nhập" value={user} onChange={e=>setUser(e.target.value)} onKeyDown={handleEnter} />
+                        <input type="password" className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Mật khẩu" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={handleEnter} />
+                        <button onClick={() => onLogin(user, pass)} disabled={loading} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition-colors">
+                            {loading ? "Đang kiểm tra..." : "ĐĂNG NHẬP"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
 
     const UI_Icons = {
         Save: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
@@ -446,14 +469,14 @@
         );
     };
 
-    // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (FINAL) ---
-    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom }) => {
+// --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (ĐÃ CẬP NHẬT NÚT ĐĂNG XUẤT) ---
+    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom, onLogout, currentUser }) => {
         const [reports, setReports] = useState([]);
         const [loading, setLoading] = useState(false);
         const [filterDate, setFilterDate] = useState(""); 
         const [filterCode, setFilterCode] = useState("");
         const [downloadedIds, setDownloadedIds] = useState([]);
-        const [previewImages, setPreviewImages] = useState(null); // State xem ảnh
+        const [previewImages, setPreviewImages] = useState(null);
 
         useEffect(() => {
             const updateDownloadedStatus = () => {
@@ -525,14 +548,27 @@
                 {/* MODAL XEM ẢNH TRONG LIST */}
                 <ImageGalleryModal images={previewImages} onClose={() => setPreviewImages(null)} onZoom={onZoom} />
 
-                {/* HEADER */}
+                {/* HEADER (ĐÃ SỬA: THÊM NÚT ĐĂNG XUẤT) */}
                 <div className="bg-white border-b px-3 py-2 shadow-sm flex items-center justify-between shrink-0 h-14 relative z-20">
-                    <h2 className="text-base font-bold text-blue-800 uppercase flex items-center gap-2">
-                        <UI_Icons.Database size={18} /> Kho Dữ Liệu
-                    </h2>
-                    <button onClick={onCreateNew} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full transition-colors shadow-md font-bold flex items-center gap-2 text-sm">
-                        <UI_Icons.Plus size={18} strokeWidth={3} /> Tạo Mới
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-blue-800 uppercase flex items-center gap-1">
+                            <UI_Icons.Database size={18} /> Kho Dữ Liệu
+                        </h2>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        {/* Hiển thị tên user trên màn hình lớn */}
+                        <span className="text-xs font-bold text-gray-500 hidden sm:block mr-1">Hi, {currentUser}</span>
+                        
+                        {/* NÚT ĐĂNG XUẤT MỚI */}
+                        <button onClick={onLogout} className="bg-gray-100 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-full transition-colors border border-gray-200 font-bold text-xs flex items-center gap-1">
+                            Thoát
+                        </button>
+
+                        <button onClick={onCreateNew} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full transition-colors shadow-md font-bold flex items-center gap-2 text-sm">
+                            <UI_Icons.Plus size={18} strokeWidth={3} /> Tạo Mới
+                        </button>
+                    </div>
                 </div>
 
                 {/* FILTER BAR */}
@@ -561,10 +597,7 @@
                                     {reports.map(r => {
                                         const isDownloaded = downloadedIds.includes(r.id);
                                         const btnClass = isDownloaded ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-green-700 hover:border-green-300";
-                                        
-                                        // Kiểm tra số lượng ảnh
                                         const imgCount = r.du_lieu_form?.hinh_anh ? r.du_lieu_form.hinh_anh.length : 0;
-
                                         return (
                                             <div key={r.id} className="px-3 py-2.5 hover:bg-blue-50 transition-colors group cursor-default">
                                                 <div className="flex items-center justify-between gap-2">
@@ -577,15 +610,9 @@
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0 self-center">
-                                                        {/* --- NÚT XEM ẢNH (ĐÃ SỬA ICON) --- */}
                                                         {imgCount > 0 ? (
-                                                            <button onClick={() => setPreviewImages(r.du_lieu_form.hinh_anh)} className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm" title="Xem ảnh hiện trường">
-                                                                <UI_Icons.Image size={14}/> {imgCount}
-                                                            </button>
-                                                        ) : (
-                                                            <button className="p-1.5 text-gray-300 cursor-not-allowed" title="Không có ảnh"><UI_Icons.Image size={16}/></button>
-                                                        )}
-
+                                                            <button onClick={() => setPreviewImages(r.du_lieu_form.hinh_anh)} className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm" title="Xem ảnh hiện trường"><UI_Icons.Image size={14}/> {imgCount}</button>
+                                                        ) : (<button className="p-1.5 text-gray-300 cursor-not-allowed" title="Không có ảnh"><UI_Icons.Image size={16}/></button>)}
                                                         <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
                                                         <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-2.5 py-1.5 border rounded text-[11px] font-bold active:scale-95 transition-all shadow-sm ${btnClass}`}><UI_Icons.Download size={14}/> Word</button>
                                                         <button onClick={(e) => handleDelete(r.id, e)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded ml-1 transition-colors active:scale-95"><UI_Icons.Trash2 size={18}/></button>
@@ -604,6 +631,45 @@
     };
 
     const App = () => {
+
+// --- CHÈN ĐOẠN NÀY VÀO ĐẦU TIÊN TRONG App ---
+        const [isAuthenticated, setIsAuthenticated] = useState(false);
+        const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+        const [currentUser, setCurrentUser] = useState(null);
+
+        // Tự động đăng nhập nếu đã lưu phiên trước đó
+        useEffect(() => {
+            const savedUser = localStorage.getItem('bskht_user');
+            if (savedUser) { setIsAuthenticated(true); setCurrentUser(savedUser); }
+        }, []);
+
+        // Hàm xử lý đăng nhập
+        const handleLogin = async (username, password) => {
+            if(!username || !password) return alert("Vui lòng nhập đủ thông tin!");
+            setIsCheckingAuth(true);
+            try {
+                const { data, error } = await supabase.from('app_users').select('*').eq('username', username).eq('password', password).single();
+                if (error || !data) {
+                    alert("Sai tên đăng nhập hoặc mật khẩu!");
+                } else {
+                    localStorage.setItem('bskht_user', data.full_name || username);
+                    setCurrentUser(data.full_name || username);
+                    setIsAuthenticated(true);
+                }
+            } catch (e) { alert("Lỗi kết nối: " + e.message); }
+            setIsCheckingAuth(false);
+        };
+
+        // Hàm đăng xuất
+        const handleLogout = () => {
+            if(confirm("Đăng xuất khỏi tài khoản?")) {
+                localStorage.removeItem('bskht_user');
+                setIsAuthenticated(false);
+                setCurrentUser(null);
+            }
+        };
+
+
         // --- 1. CÁC HÀM TIỆN ÍCH (DATE HELPER) ---
         // Lấy ngày hôm nay chuẩn ISO (yyyy-mm-dd) cho input type="date"
         const getTodayISO = () => {
@@ -1083,6 +1149,9 @@
         const addRiskRow = (type) => { const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD'; setFormData({ ...formData, [listKey]: [...formData[listKey], { riskId: "", moiNguy: "", moTa: "", bac: "", bienPhap: "" }] }); };
         const removeRiskRow = (type, index) => { const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD'; const newRisks = formData[listKey].filter((_, i) => i !== index); setFormData({...formData, [listKey]: newRisks}); };
 
+// Nếu chưa đăng nhập thì hiện màn hình Login
+        if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} loading={isCheckingAuth} />;
+
         return (
             <div className="pb-20">
                 {/* --- MODAL PHÓNG TO ẢNH (MỚI - TOÀN MÀN HÌNH ĐEN) --- */}
@@ -1113,7 +1182,16 @@
 
                 {showDiagram && <DiagramEditor initialData={diagramData} onSave={(data) => setDiagramData(data)} onClose={() => setShowDiagram(false)} />}
                 <RiskSelectModal isOpen={modalConfig.isOpen} onClose={() => setModalConfig({...modalConfig, isOpen: false})} title={modalConfig.title} options={modalConfig.options} selectedValues={modalConfig.currentValue} onSave={saveModalSelection} />
-                <ReportListPage isOpen={showReportList} onCreateNew={handleCreateNew} onLoad={handleLoadReport} onExport={handleExportDocx} onZoom={(url) => setZoomImage(url)} />
+                {/* Đã thêm onLogout và currentUser vào đây */}
+                <ReportListPage 
+                    isOpen={showReportList} 
+                    onCreateNew={handleCreateNew} 
+                    onLoad={handleLoadReport} 
+                    onExport={handleExportDocx} 
+                    onZoom={(url) => setZoomImage(url)} 
+                    onLogout={handleLogout}      // <--- Mới
+                    currentUser={currentUser}    // <--- Mới
+                />
                 <RiskManagerModal isOpen={showRiskManager} onClose={() => setShowRiskManager(false)} onRefresh={fetchRiskLibrary} existingRisks={riskLibrary.risks} />
 
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
