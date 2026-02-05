@@ -3,92 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Biên Bản Khảo Sát Hiện Trường</title>
+    <title>Biên Bản KSHT & Sơ Đồ (Phiên bản V2.5 Ổn định)</title>
     
-    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <style>
         body { font-family: 'Times New Roman', sans-serif; background-color: #f3f4f6; }
         .a4-paper { background: white; max-width: 210mm; margin: 0 auto; padding: 10mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); min-height: 297mm; }
         input, textarea, select { font-family: 'Times New Roman', sans-serif; }
-        
-        /* Mobile Adjustments */
-        @media (max-width: 768px) {
-            .a4-paper { padding: 15px; width: 100%; max-width: 100%; }
-            body { background-color: white; }
-        }
-
-        .input-line {
-            border: none;
-            border-bottom: 1px dotted #9ca3af;
-            width: 100%;
-            outline: none;
-            background: transparent;
-            padding: 2px 0;
-            color: #1f2937;
-            font-weight: 500;
-        }
+        @media (max-width: 768px) { .a4-paper { padding: 15px; width: 100%; max-width: 100%; } body { background-color: white; } }
+        .input-line { border: none; border-bottom: 1px dotted #9ca3af; width: 100%; outline: none; background: transparent; padding: 2px 0; color: #1f2937; font-weight: 500; }
         .input-line:focus { border-bottom: 1px solid #2563eb; }
-        
         .section-title { font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; }
-        
-        /* Table Styles */
         table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 14px; }
         th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
         th { background-color: #f9fafb; font-weight: bold; text-align: center; }
-        
-        /* Quick Tag Button */
-        .tag-btn {
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 4px 8px; border-radius: 9999px;
-            font-size: 12px; font-weight: 500;
-            background-color: #eff6ff; color: #1d4ed8;
-            border: 1px solid #bfdbfe; cursor: pointer;
-            transition: all 0.2s; white-space: nowrap;
-        }
+        .tag-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .tag-btn:active { transform: scale(0.95); background-color: #dbeafe; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .animate-slide-up { animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
 <body>
 
 <div id="root"></div>
 
-<script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-    const { Save, Plus, Trash2, FileText, Share2, Printer } = lucide;
+<script>
+    window.onerror = function(msg, src, line) { 
+        document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px"><h2>Đã xảy ra lỗi!</h2><p>Nội dung: ' + msg + '</p><p>Dòng số: ' + line + '</p><p>Hãy thử tải lại trang (F5).</p></div>'; 
+    };
+</script>
 
-    // --- CẤU HÌNH SUPABASE ---
+<script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+    
+    // --- CẤU HÌNH SUPABASE (Database) ---
     const supabaseUrl = 'https://wvcjrmcahndwenqnkdim.supabase.co'
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y2pybWNhaG5kd2VucW5rZGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NTI4NjQsImV4cCI6MjA4NDUyODg2NH0.GoacKpBBCut6yhmYUWTLeAdbsGwzJSR2AQJrON5mEvM'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // --- COMPONENT CHỌN GIỜ 24H ---
+    // --- BỘ ICON ---
+    const UI_Icons = {
+        Save: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
+        Plus: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+        Trash2: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+        FileText: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>,
+        Share2: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>,
+        X: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+        FolderOpen: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>,
+        CheckSquare: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>,
+        Download: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
+        Database: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s 9-1.34 9-3V5"></path></svg>,
+        Minus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+        Zap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+        ZapFill: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+        Square: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>,
+        Type: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>,
+        RotateCcw: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>,
+        Edit: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
+        Grid: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
+        ZoomIn: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
+        ZoomOut: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
+        Target: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+    };
+
+    // --- MODULE VẼ SƠ ĐỒ ---
+    const GRID_SIZE = 5;
+    const COLORS = { wire: '#000000', grid: '#e2e8f0', pvlv: '#ef4444', highlight: '#3b82f6', text: '#000000' };
+    const TOOL_BTN_CLASS = "flex flex-col items-center justify-center px-2 py-1 rounded border border-transparent hover:bg-gray-100 min-w-[55px] transition-colors cursor-pointer active:bg-gray-200 touch-manipulation";
+    const ACTION_BTN_CLASS = "flex items-center gap-2 border px-3 py-2 rounded-full shadow-md bg-white hover:bg-gray-50 transition-all active:scale-95 cursor-pointer text-sm font-medium whitespace-nowrap touch-manipulation";
+    const snapToGrid = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
+    
+    const DiagramEditor = ({ initialData, onSave, onClose }) => {
+        const [objects, setObjects] = useState(initialData || []);
+        const [selectedId, setSelectedId] = useState(null);
+        const [showTemplateModal, setShowTemplateModal] = useState(false);
+        const [templates, setTemplates] = useState([]);
+        const [loadingTemplates, setLoadingTemplates] = useState(false);
+        const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+        const [isPanning, setIsPanning] = useState(false);
+        const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
+        const [dragState, setDragState] = useState({ isDragging: false, draggedId: null, startX: 0, startY: 0, initialObj: null, type: 'move', handle: null });
+        
+        useEffect(() => {
+            if (!initialData || initialData.length === 0) {
+                   const cx = snapToGrid(window.innerWidth / 2); const cy = 200;
+                   setObjects([
+                        { id: 'line_src', type: 'line', x1: cx - 100, y1: cy, x2: cx + 100, y2: cy, strokeWidth: 2, dash: false },
+                        { id: 'txt_src', type: 'text', x: cx - 90, y: cy - 20, text: "Tuyến 475", fontSize: 14, rotate: 0 },
+                        { id: 'dev_fco', type: 'icon_device', subType: 'FCO', x: cx, y: cy + 80, label: "03FCO" },
+                        { id: 'line_br', type: 'line', x1: cx, y1: cy, x2: cx, y2: cy + 200, strokeWidth: 2, dash: false },
+                        { id: 'junc', type: 'circle', cx: cx, cy: cy, r: 4, fill: 'black' },
+                        { id: 'load', type: 'icon_load', subType: 'TBA', x: cx, y: cy + 200, label: "TBA 250kVA" }
+                   ]);
+            }
+        }, []);
+        
+        const fetchTemplates = async () => {
+            setLoadingTemplates(true);
+            let localTemplates = [];
+            try { const local = localStorage.getItem('local_diagram_templates'); if (local) localTemplates = JSON.parse(local); } catch(e) {}
+            let cloudTemplates = [];
+            try { const { data, error } = await supabase.from('diagram_templates').select('*').order('created_at', { ascending: false }); if (!error && data) cloudTemplates = data; } catch(e) {}
+            setTemplates([...localTemplates, ...cloudTemplates]);
+            setLoadingTemplates(false);
+        };
+        const handleSaveTemplate = async () => {
+            const name = prompt("Nhập tên mẫu để lưu:"); if (!name) return;
+            const newTplData = { name: name, data: objects };
+            try {
+                const local = JSON.parse(localStorage.getItem('local_diagram_templates') || '[]');
+                const localTpl = { ...newTplData, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
+                local.unshift(localTpl); localStorage.setItem('local_diagram_templates', JSON.stringify(local));
+                supabase.from('diagram_templates').insert([newTplData]).then(({ error }) => { if (error) console.warn("Cloud save failed:", error.message); });
+                alert("Đã lưu mẫu thành công!"); fetchTemplates();
+            } catch (e) { alert("Lỗi lưu mẫu: " + e.message); }
+        };
+        const handleDeleteTemplate = async (id, e) => {
+            e.stopPropagation(); if(!confirm("Bạn có chắc muốn xóa mẫu này?")) return;
+            if (String(id).startsWith('local_')) {
+                const local = JSON.parse(localStorage.getItem('local_diagram_templates') || '[]');
+                localStorage.setItem('local_diagram_templates', JSON.stringify(local.filter(t => t.id !== id))); fetchTemplates();
+            } else { await supabase.from('diagram_templates').delete().eq('id', id); fetchTemplates(); }
+        };
+        const handleLoadTemplate = (tpl) => { if(confirm(`Dùng mẫu "${tpl.name}"?`)) { setObjects(tpl.data); setShowTemplateModal(false); } };
+        const openTemplateModal = () => { setShowTemplateModal(true); fetchTemplates(); };
+        const screenToWorld = (screenX, screenY) => ({ x: (screenX - viewport.x) / viewport.scale, y: (screenY - viewport.y) / viewport.scale });
+        
+        const handlePointerDown = (e) => {
+            if (e.target.closest('button')) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            if (e.touches && e.touches.length > 1) return;
+            const targetIsObject = e.target.getAttribute('data-type') === 'object';
+            if (targetIsObject) {
+                e.stopPropagation(); const worldPos = screenToWorld(clientX, clientY); const objId = e.target.getAttribute('data-id'); const handleType = e.target.getAttribute('data-handle'); const obj = objects.find(o => o.id === objId);
+                if (obj) { setSelectedId(objId); setDragState({ isDragging: true, draggedId: objId, startX: worldPos.x, startY: worldPos.y, initialObj: { ...obj }, type: handleType ? 'resize' : 'move', handle: handleType }); }
+            } else { setIsPanning(true); setLastPanPoint({ x: clientX, y: clientY }); setSelectedId(null); }
+        };
+        const handlePointerMove = (e) => {
+            e.preventDefault(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            if (e.touches && e.touches.length > 1) { setLastPanPoint({ x: clientX, y: clientY }); return; }
+            if (isPanning) { const dx = clientX - lastPanPoint.x; const dy = clientY - lastPanPoint.y; setViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy })); setLastPanPoint({ x: clientX, y: clientY }); return; }
+            if (dragState.isDragging) {
+                const worldPos = screenToWorld(clientX, clientY); const dx = worldPos.x - dragState.startX; const dy = worldPos.y - dragState.startY; const init = dragState.initialObj;
+                setObjects(prev => prev.map(obj => { if (obj.id !== dragState.draggedId) return obj;
+                    if (dragState.type === 'resize') { if (obj.type === 'rect_pvlv') { const newW = snapToGrid(init.width + (dragState.handle === 'se' ? dx : 0)); const newH = snapToGrid(init.height + (dragState.handle === 'se' ? dy : 0)); return { ...obj, width: Math.max(20, newW), height: Math.max(20, newH) }; } if (obj.type === 'line') { if (dragState.handle === 'start') return { ...obj, x1: snapToGrid(init.x1 + dx), y1: snapToGrid(init.y1 + dy) }; if (dragState.handle === 'end') return { ...obj, x2: snapToGrid(init.x2 + dx), y2: snapToGrid(init.y2 + dy) }; } return obj; }
+                    if (obj.type === 'line') return { ...obj, x1: snapToGrid(init.x1 + dx), y1: snapToGrid(init.y1 + dy), x2: snapToGrid(init.x2 + dx), y2: snapToGrid(init.y2 + dy) }; else if (obj.type === 'circle') return { ...obj, cx: snapToGrid(init.cx + dx), cy: snapToGrid(init.cy + dy) }; else return { ...obj, x: snapToGrid(init.x + dx), y: snapToGrid(init.y + dy) };
+                }));
+            }
+        };
+        const handlePointerUp = () => { setIsPanning(false); setDragState({ ...dragState, isDragging: false }); };
+        const addObjectToCenter = (newObj) => { const centerX = (window.innerWidth / 2 - viewport.x) / viewport.scale; const centerY = (window.innerHeight / 2 - viewport.y) / viewport.scale; let updatedObj = { ...newObj }; const cx = snapToGrid(centerX); const cy = snapToGrid(centerY); if (newObj.type === 'line') { updatedObj.x1 = cx - 60; updatedObj.y1 = cy; updatedObj.x2 = cx + 60; updatedObj.y2 = cy; } else if (newObj.type === 'circle') { updatedObj.cx = cx; updatedObj.cy = cy; } else { updatedObj.x = cx; updatedObj.y = cy; } setObjects([...objects, updatedObj]); setSelectedId(updatedObj.id); };
+        
+        return (
+            <div className="fixed inset-0 z-[100] bg-gray-200 flex flex-col h-full w-full" style={{touchAction: 'none'}}>
+                {showTemplateModal && (<div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4" onClick={() => setShowTemplateModal(false)}><div className="bg-white rounded-lg w-full max-w-md shadow-xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}><div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg"><h3 className="font-bold text-lg flex items-center gap-2"><UI_Icons.FolderOpen /> Danh sách Mẫu</h3><button onClick={() => setShowTemplateModal(false)} className="p-1 hover:bg-gray-200 rounded"><UI_Icons.X /></button></div><div className="p-4 border-b bg-blue-50"><button onClick={handleSaveTemplate} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded flex items-center justify-center gap-2"><UI_Icons.Save /> Lưu sơ đồ hiện tại thành Mẫu mới</button></div><div className="overflow-y-auto p-4 space-y-2 flex-1">{loadingTemplates ? <div className="text-center text-gray-500">Đang tải...</div> : (templates.length === 0 ? <div className="text-center text-gray-400 italic">Chưa có mẫu nào</div> : templates.map(t => (<div key={t.id} onClick={() => handleLoadTemplate(t)} className="flex items-center justify-between p-3 border rounded hover:bg-gray-100 cursor-pointer group transition-colors"><span className="font-medium text-gray-800">{t.name}</span><button onClick={(e) => handleDeleteTemplate(t.id, e)} className="text-gray-400 hover:text-red-600 p-1"><UI_Icons.Trash2 /></button></div>)))}</div><div className="p-3 border-t bg-gray-50 flex justify-end"><button onClick={() => setShowTemplateModal(false)} className="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-medium">Đóng</button></div></div></div>)}
+                <div className="bg-blue-600 text-white p-3 shadow-md flex justify-between items-center z-10 shrink-0"><h1 className="text-sm font-bold uppercase flex items-center gap-2"><UI_Icons.Grid /> Trình Vẽ Sơ Đồ</h1><button onClick={openTemplateModal} className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-3 py-1.5 rounded flex items-center gap-1 shadow font-bold text-xs"><UI_Icons.FolderOpen /> 📂 Mẫu Sơ Đồ</button><div className="flex gap-2"><button onClick={onClose} className="text-xs bg-white text-gray-700 hover:bg-gray-100 px-3 py-1.5 rounded flex items-center gap-1 shadow font-bold">Thoát</button><button onClick={() => { onSave(objects); onClose(); }} className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded flex items-center gap-1 shadow font-bold"><UI_Icons.Save /> Lưu</button></div></div>
+                <div className="bg-white border-b p-2 flex gap-2 overflow-x-auto no-scrollbar shadow-sm shrink-0 items-center z-10">
+                    <div className="flex gap-1 border-r pr-2 shrink-0"><button onClick={() => addObjectToCenter({ id: `l_${Date.now()}`, type: 'line', strokeWidth: 2, dash: false })} className={TOOL_BTN_CLASS}><UI_Icons.Minus /> <span className="text-[9px] mt-1 font-semibold">Dây</span></button><button onClick={() => addObjectToCenter({ id: `j_${Date.now()}`, type: 'circle', r: 4, fill: 'black' })} className={TOOL_BTN_CLASS}><div className="w-3 h-3 bg-black rounded-full mb-1"></div> <span className="text-[9px] mt-1 font-semibold">Nút</span></button></div>
+                    <div className="flex gap-1 border-r pr-2 shrink-0"><button onClick={() => addObjectToCenter({ id: `d_${Date.now()}`, type: 'icon_device', subType: 'FCO', label: "03FCO" })} className={TOOL_BTN_CLASS}><UI_Icons.Zap /> <span className="text-[9px] mt-1 font-semibold">FCO</span></button><button onClick={() => addObjectToCenter({ id: `d_${Date.now()}`, type: 'icon_device', subType: 'LBFCO', label: "03LBFCO" })} className={TOOL_BTN_CLASS}><UI_Icons.ZapFill /> <span className="text-[9px] mt-1 font-semibold">LBFCO</span></button></div>
+                    <div className="flex gap-1 border-r pr-2 shrink-0"><button onClick={() => addObjectToCenter({ id: `ld_${Date.now()}`, type: 'icon_load', subType: 'TBA', label: "TBA..." })} className={TOOL_BTN_CLASS}><div className="text-[10px] font-bold border border-gray-600 rounded px-1 mb-1">TBA</div> <span className="text-[9px] font-semibold">MBA</span></button><button onClick={() => addObjectToCenter({ id: `g_${Date.now()}`, type: 'icon_ground', direction: 'left' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><line x1="2" y1="2" x2="14" y2="14" stroke="black"/><circle cx="2" cy="2" r="1.5"/></svg><span className="text-[9px] font-semibold">TĐ(T)</span></button><button onClick={() => addObjectToCenter({ id: `g_${Date.now()}`, type: 'icon_ground', direction: 'right' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><line x1="14" y1="2" x2="2" y2="14" stroke="black"/><circle cx="14" cy="2" r="1.5"/></svg><span className="text-[9px] font-semibold">TĐ(P)</span></button><button onClick={() => addObjectToCenter({ id: `glv_${Date.now()}`, type: 'icon_ground_lv', direction: 'left' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><circle cx="12" cy="2" r="1.5" fill="black"/><line x1="12" y1="2" x2="6" y2="8" stroke="black" strokeWidth="1.5"/><line x1="2" y1="8" x2="10" y2="8" stroke="black" strokeWidth="1.5"/><line x1="4" y1="11" x2="8" y2="11" stroke="black" strokeWidth="1.5"/></svg><span className="text-[9px] font-semibold">HT(T)</span></button><button onClick={() => addObjectToCenter({ id: `glv_${Date.now()}`, type: 'icon_ground_lv', direction: 'right' })} className={TOOL_BTN_CLASS}><svg width="14" height="14" viewBox="0 0 16 16" className="mb-1"><circle cx="2" cy="2" r="1.5" fill="black"/><line x1="2" y1="2" x2="8" y2="8" stroke="black" strokeWidth="1.5"/><line x1="4" y1="8" x2="12" y2="8" stroke="black" strokeWidth="1.5"/><line x1="6" y1="11" x2="10" y2="11" stroke="black" strokeWidth="1.5"/></svg><span className="text-[9px] font-semibold">HT(P)</span></button></div>
+                    <div className="flex gap-1 shrink-0"><button onClick={() => addObjectToCenter({ id: `p_${Date.now()}`, type: 'rect_pvlv', width: 120, height: 100 })} className={TOOL_BTN_CLASS}><UI_Icons.Square className="text-red-500" strokeWidth="2" strokeDasharray="2 2" /> <span className="text-[9px] mt-1 font-semibold">PVLV</span></button><button onClick={() => addObjectToCenter({ id: `t_${Date.now()}`, type: 'text', text: "Ghi chú...", fontSize: 14, rotate: 0 })} className={TOOL_BTN_CLASS}><UI_Icons.Type /> <span className="text-[9px] mt-1 font-semibold">Chữ</span></button></div>
+                </div>
+                <div className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} style={{ cursor: isPanning ? 'grabbing' : 'default' }}><svg width="100%" height="100%" style={{backgroundColor: 'white'}}><defs><pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse" patternTransform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}><path d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`} fill="none" stroke={COLORS.grid} strokeWidth="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" />{objects.map(obj => {const isSelected = obj.id === selectedId;if (obj.type === 'line') return (<g key={obj.id} data-id={obj.id} data-type="object"><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} pointerEvents="none" /><line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="transparent" strokeWidth="20" data-id={obj.id} data-type="object" />{isSelected && <line x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}{isSelected && <circle cx={obj.x1} cy={obj.y1} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="start" />}{isSelected && <circle cx={obj.x2} cy={obj.y2} r="8" fill={COLORS.highlight} fillOpacity="0.5" data-id={obj.id} data-type="object" data-handle="end" />}</g>); if (obj.type === 'circle') return (<circle key={obj.id} cx={obj.cx} cy={obj.cy} r={isSelected ? 6 : 4} fill={isSelected ? COLORS.highlight : "black"} data-id={obj.id} data-type="object" />); if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-20" y="-20" width="40" height="40" fill="transparent" data-id={obj.id} data-type="object"/>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO' ? "black" : "none"} /></g>) : (<g pointerEvents="none" stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-22" y="-22" width="44" height="44" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); if (obj.type === 'icon_load') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="50" fill="transparent" data-id={obj.id} data-type="object"/>{obj.subType === 'TBA' ? (<g pointerEvents="none" stroke="black" strokeWidth="2" fill="none"><circle cx="0" cy="0" r="18" fill="white"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" strokeWidth="2"/></g>) : (<rect pointerEvents="none" x="-18" y="-25" width="36" height="50" fill="white" stroke="black" strokeWidth="2"/>)}<text x="25" y="5" fontSize="12" fontWeight="bold" pointerEvents="none">{obj.label}</text>{isSelected && <rect x="-28" y="-28" width="56" height="56" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>); if (obj.type === 'icon_ground') {const dx = obj.direction === 'left' ? -20 : 20, dy = -20;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x="-25" y="-25" width="50" height="35" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none"><line x1={dx} y1={dy} x2="0" y2="0" stroke="black" strokeWidth="2"/><circle cx={dx} cy={dy} r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" strokeWidth="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" strokeWidth="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" strokeWidth="2"/></g>{isSelected && <rect x="-25" y="-25" width="50" height="35" fill="none" stroke={COLORS.highlight} strokeWidth="2" strokeDasharray="3 3" pointerEvents="none"/>}</g>);} if (obj.type === 'icon_ground_lv') {const isLeft = obj.direction === 'left';const barX = isLeft ? -10 : 10;const barY = 10;const rectX = isLeft ? -20 : 0;const rectY = 0;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect x={rectX} y={rectY} width="20" height="20" fill="transparent" data-id={obj.id} data-type="object"/><g pointerEvents="none" stroke="black" strokeWidth="1.5"><circle cx="0" cy="0" r="2" fill="black" stroke="none" /><line x1="0" y1="0" x2={barX} y2={10}/><line x1={barX - 8} y1={10} x2={barX + 8} y2={10}/><line x1={barX - 5} y1={barY + 3} x2={barX + 5} y2={13}/><line x1={barX - 2} y1={barY + 6} x2={barX + 2} y2={16}/></g>{isSelected && <rect x={rectX} y={rectY} width="20" height="20" fill="none" stroke={COLORS.highlight} strokeWidth="1" strokeDasharray="2 2" pointerEvents="none"/>}</g>);} if (obj.type === 'text') return (<text key={obj.id} x={obj.x} y={obj.y} fontSize={obj.fontSize} fill={isSelected ? COLORS.highlight : "black"} transform={`rotate(${obj.rotate || 0}, ${obj.x}, ${obj.y})`} style={{fontWeight: isSelected ? 'bold' : 'normal'}} data-id={obj.id} data-type="object">{obj.text}</text>); if (obj.type === 'rect_pvlv') return <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} data-id={obj.id} data-type="object"><rect width={obj.width} height={obj.height} fill="rgba(239, 68, 68, 0.05)" stroke={COLORS.pvlv} strokeWidth="2" strokeDasharray="5 5" data-id={obj.id} data-type="object"/><text x="5" y="15" fill={COLORS.pvlv} fontSize="10" fontWeight="bold" pointerEvents="none">PVLV</text>{isSelected && <rect x={obj.width - 20} y={obj.height - 20} width="20" height="20" fill="white" stroke={COLORS.highlight} strokeWidth="2" data-id={obj.id} data-type="object" data-handle="se" />}</g>; return null; })}</svg><div className="absolute top-4 right-4 flex flex-col gap-3"><button onClick={() => setViewport({ x: 0, y: 0, scale: 1 })} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100" title="Về giữa"><UI_Icons.Target/></button><button onClick={() => setViewport(prev => ({ ...prev, scale: Math.min(prev.scale * 1.2, 3) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomIn/></button><button onClick={() => setViewport(prev => ({ ...prev, scale: Math.max(prev.scale / 1.2, 0.5) }))} className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 active:bg-gray-100"><UI_Icons.ZoomOut/></button></div></div>
+                {selectedId && (<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-4 py-3 rounded-full shadow-2xl border border-gray-200 flex items-center gap-3 animate-slide-up z-50 overflow-x-auto max-w-[90%] no-scrollbar">{['text', 'icon_device', 'icon_load'].includes(objects.find(o => o.id === selectedId)?.type) && (<button onClick={() => { const obj = objects.find(o => o.id === selectedId); const next = prompt("Nhập nội dung mới:", obj.type === 'text' ? obj.text : obj.label); if (next !== null) setObjects(prev => prev.map(o => o.id === selectedId ? (o.type === 'text' ? { ...o, text: next } : { ...o, label: next }) : o)); }} className={ACTION_BTN_CLASS + " text-orange-600 border-orange-200"}><UI_Icons.Edit/> Sửa</button>)}{(objects.find(o => o.id === selectedId)?.type === 'text' || objects.find(o => o.id === selectedId)?.type === 'line') && (<button onClick={() => setObjects(prev => prev.map(o => { if (o.id !== selectedId) return o; if (o.type === 'line') { const mx = (o.x1+o.x2)/2, my = (o.y1+o.y2)/2, dx = o.x1-mx, dy = o.y1-my; return { ...o, x1: snapToGrid(mx-dy), y1: snapToGrid(my+dx), x2: snapToGrid(mx+dy), y2: snapToGrid(my-dx) }; } return o.type === 'text' ? { ...o, rotate: o.rotate === 0 ? -90 : 0 } : o; }))} className={ACTION_BTN_CLASS + " text-purple-600 border-purple-200"}><UI_Icons.RotateCcw/> Xoay</button>)}{objects.find(o => o.id === selectedId)?.type === 'line' && (<button onClick={() => setObjects(prev => prev.map(o => o.id === selectedId && o.type === 'line' ? { ...o, dash: !o.dash } : o))} className={ACTION_BTN_CLASS + " text-blue-600 border-blue-200"}><UI_Icons.Minus/> Đứt/Liền</button>)}<div className="w-[1px] h-6 bg-gray-300 mx-1"></div><button onClick={() => { setObjects(objects.filter(o => o.id !== selectedId)); setSelectedId(null); }} className={ACTION_BTN_CLASS + " text-red-600 border-red-200 bg-red-50"}><UI_Icons.Trash2/> Xóa</button><button onClick={() => setSelectedId(null)} className="p-2 text-gray-400 hover:text-gray-600"><UI_Icons.X /></button></div>)}
+            </div>
+        );
+    };
+
+    const DiagramPreview = ({ objects }) => {
+        if (!objects || objects.length === 0) return null;
+        const xs = objects.map(o => o.x || o.cx || o.x1); const ys = objects.map(o => o.y || o.cy || o.y1);
+        const minX = Math.min(...xs) - 50; const maxX = Math.max(...xs) + 50; const minY = Math.min(...ys) - 50;
+        const maxY = Math.max(...ys) + 50; const width = maxX - minX; const height = maxY - minY;
+        return (
+            <svg width="100%" height="100%" viewBox={`${minX} ${minY} ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+                 {objects.map(obj => {
+                    if (obj.type === 'line') return <line key={obj.id} x1={obj.x1} y1={obj.y1} x2={obj.x2} y2={obj.y2} stroke="black" strokeWidth={obj.strokeWidth} strokeDasharray={obj.dash ? "5,5" : "none"} />;
+                    if (obj.type === 'circle') return <circle key={obj.id} cx={obj.cx} cy={obj.cy} r={4} fill="black" />;
+                    if (obj.type === 'icon_device') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}>{['FCO', 'LBFCO'].includes(obj.subType) ? (<g stroke="black" strokeWidth="2" fill="none"><line x1="-20" y1="-20" x2="20" y2="20"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" strokeWidth="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill={obj.subType === 'LBFCO'?"black":"none"}/></g>) : (<g stroke="black" strokeWidth="2"><rect x="-15" y="-15" width="30" height="30" fill="white"/><line x1="-15" y1="-15" x2="15" y2="15"/><line x1="15" y1="-15" x2="-15" y2="15"/></g>)}<text x="20" y="5" fontSize="12" fontWeight="bold">{obj.label}</text></g>);
+                    if (obj.type === 'icon_load') return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}>{obj.subType === 'TBA' ? (<g stroke="black" strokeWidth="2" fill="none"><circle cx="0" cy="0" r="18" fill="white"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" stroke-width="2"/></g>) : (<rect x="-18" y="-25" width="36" height="50" fill="white" stroke="black" stroke-width="2"/>)}<text x="25" y="5" fontSize="12" fontWeight="bold">{obj.label}</text></g>);
+                    if (obj.type === 'icon_ground') {const dx = obj.direction === 'left' ? -20 : 20;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}><line x1={dx} y1={-20} x2="0" y2="0" stroke="black" stroke-width="2"/><circle cx={dx} cy={-20} r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" stroke-width="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" stroke-width="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" stroke-width="2"/></g>);}
+                    if (obj.type === 'icon_ground_lv') {const isLeft = obj.direction === 'left';const barX = isLeft ? -10 : 10;const barY = 10;const rectX = isLeft ? -20 : 0;const rectY = 0;return (<g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`} stroke="black" strokeWidth="1.5"><circle cx="0" cy="0" r="2" fill="black" stroke="none"/><line x1="0" y1="0" x2={barX} y2={10}/><line x1={barX-8} y1={10} x2={barX+8} y2={10}/><line x1={barX-5} y1={13} x2={barX+5} y2={13}/><line x1={barX-2} y1={16} x2={barX+2} y2={16}/></g>);}
+                    if (obj.type === 'text') return <text key={obj.id} x={obj.x} y={obj.y} fontSize={obj.fontSize} fill="black" transform={`rotate(${obj.rotate||0}, ${obj.x}, ${obj.y})`}>{obj.text}</text>;
+                    if (obj.type === 'rect_pvlv') return <g key={obj.id} transform={`translate(${obj.x}, ${obj.y})`}><rect width={obj.width} height={obj.height} fill="rgba(239, 68, 68, 0.05)" stroke={COLORS.pvlv} strokeWidth="2" strokeDasharray="5 5"/><text x="5" y="15" fill={COLORS.pvlv} fontSize="10" fontWeight="bold">PVLV</text></g>;
+                    return null;
+                })}
+            </svg>
+        );
+    };
+
     const TimeSelect = ({ value, onChange }) => {
         const [hour, minute] = value ? value.split(':') : ['07', '00'];
         const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
-        const minutes = Array.from({length: 60}, (_, i) => i.toString().padStart(2, '0')); 
-
+        const minutes = Array.from({length: 60}, (_, i) => i.toString().padStart(2, '0'));
         const handleChange = (type, val) => {
             let newH = hour, newM = minute;
             if (type === 'h') newH = val;
             if (type === 'm') newM = val;
             onChange(`${newH}:${newM}`);
         };
-
         return (
             <div className="inline-flex items-center border-b-2 border-gray-300 hover:border-blue-500 bg-transparent gap-0 transition-colors">
                 <select value={hour} onChange={(e) => handleChange('h', e.target.value)} className="appearance-none bg-transparent font-bold text-center outline-none cursor-pointer p-1 text-gray-800 hover:bg-gray-100 rounded">
@@ -102,29 +223,21 @@
         );
     };
 
-    // --- COMPONENT NHẬP LIỆU NHANH ---
     const QuickInputSection = ({ title, value, onChange, templates, placeholder, contextData }) => {
         const addTemplate = (template) => {
             let textToAdd = template;
             if (contextData) {
                 const fullPoleCode = `${contextData.code}/${contextData.sub}`;
-                textToAdd = textToAdd
-                    .replace(/{tru}/g, fullPoleCode)
-                    .replace(/{tuyen}/g, contextData.line || "...");
+                textToAdd = textToAdd.replace(/{tru}/g, fullPoleCode).replace(/{tuyen}/g, contextData.line || "...");
             }
             const newValue = value ? value + "\n" + textToAdd : textToAdd;
             onChange(newValue);
         };
-
         return (
             <div className="mb-4">
                 <label className="section-title block text-gray-800">{title}</label>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar mb-2 pb-1">
-                    {templates.map((t, i) => (
-                        <button key={i} onClick={() => addTemplate(t.content)} className="tag-btn flex-shrink-0">
-                            <i data-lucide="plus" width="12" height="12"></i> {t.label}
-                        </button>
-                    ))}
+                    {templates.map((t, i) => (<button key={i} onClick={() => addTemplate(t.content)} className="tag-btn flex-shrink-0"><UI_Icons.Plus size={12}/> {t.label}</button>))}
                     <button onClick={() => onChange("")} className="tag-btn flex-shrink-0 bg-red-50 text-red-600 border-red-200">Xóa</button>
                 </div>
                 <textarea className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows="4" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}></textarea>
@@ -132,417 +245,673 @@
         );
     };
 
-    // --- COMPONENT CHÍNH ---
-    const App = () => {
-        // --- DB STATE ---
-        const [dbPoles, setDbPoles] = useState([]);
-        const [dbCommunes, setDbCommunes] = useState([]);
-        const [dbStaff, setDbStaff] = useState([]);
-        const [dbPositions, setDbPositions] = useState([]);
-        const [dbUnits, setDbUnits] = useState([]);
+    const RiskManagerModal = ({ isOpen, onClose, onRefresh, existingRisks }) => {
+        const [mode, setMode] = useState('create');
+        const [selectedRiskId, setSelectedRiskId] = useState("");
+        const [name, setName] = useState("");
+        const [type, setType] = useState("ATLD");
+        const [level, setLevel] = useState("II");
+        const [desc, setDesc] = useState("");
+        const [measure, setMeasure] = useState("");
+        const [loading, setLoading] = useState(false);
+        useEffect(() => { if (isOpen) { setMode('create'); setSelectedRiskId(""); setName(""); setDesc(""); setMeasure(""); } }, [isOpen]);
+        const handleSave = async () => {
+            setLoading(true); let targetRiskId = selectedRiskId;
+            if (mode === 'create') {
+                if (!name.trim()) { alert("Vui lòng nhập tên mối nguy!"); setLoading(false); return; }
+                const { data, error } = await supabase.from('dm_moi_nguy').insert([{ ten_moi_nguy: name.trim(), bac_rr_mac_dinh: level, loai: type }]).select();
+                if (error) { alert("Lỗi lưu: " + error.message); setLoading(false); return; }
+                targetRiskId = data[0].id;
+            } else { if (!targetRiskId) { alert("Vui lòng chọn mối nguy!"); setLoading(false); return; } }
+            const descInserts = desc.split('\n').map(l => l.trim()).filter(l => l).map(d => ({ moi_nguy_id: targetRiskId, noi_dung: d }));
+            const measureInserts = measure.split('\n').map(l => l.trim()).filter(l => l).map(m => ({ moi_nguy_id: targetRiskId, noi_dung: m }));
+            if (descInserts.length > 0) await supabase.from('dm_mo_ta').insert(descInserts);
+            if (measureInserts.length > 0) await supabase.from('dm_bien_phap').insert(measureInserts);
+            alert("Đã lưu thành công!"); onRefresh(); onClose(); setLoading(false);
+        };
+        if (!isOpen) return null;
+        return (
+            <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4" onClick={onClose}>
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                    <div className="p-4 border-b bg-blue-600 text-white rounded-t-lg flex justify-between items-center"><h3 className="font-bold text-lg flex items-center gap-2"><UI_Icons.Database /> Quản Lý Thư Viện</h3><button onClick={onClose}><UI_Icons.X size={20}/></button></div>
+                    <div className="p-5 overflow-y-auto flex-1 space-y-4">
+                        <div className="flex border rounded overflow-hidden mb-4"><button className={`flex-1 py-2 font-bold ${mode === 'create' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-500'}`} onClick={() => setMode('create')}>Tạo Mới</button><button className={`flex-1 py-2 font-bold ${mode === 'update' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-500'}`} onClick={() => setMode('update')}>Cập Nhật</button></div>
+                        {mode === 'create' ? (
+                            <><div className="mb-2"><label className="block text-sm font-bold text-gray-700 mb-1">Tên mối nguy *</label><input className="w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">Loại</label><select className="w-full border rounded p-2" value={type} onChange={e => setType(e.target.value)}><option value="ATLD">ATLD</option><option value="VSLD">VSLD</option></select></div><div><label className="block text-sm font-bold text-gray-700 mb-1">Bậc RR</label><select className="w-full border rounded p-2" value={level} onChange={e => setLevel(e.target.value)}><option value="II">II</option><option value="I">I</option><option value="III">III</option></select></div></div></>
+                        ) : (<div><label className="block text-sm font-bold text-gray-700 mb-1">Chọn mối nguy *</label><select className="w-full border rounded p-2" value={selectedRiskId} onChange={e => setSelectedRiskId(e.target.value)}><option value="">-- Chọn --</option>{existingRisks.map(r => (<option key={r.id} value={r.id}>{r.ten_moi_nguy} ({r.loai})</option>))}</select></div>)}
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Thêm Mô tả (mỗi dòng 1 ý)</label><textarea className="w-full border rounded p-2" rows="3" value={desc} onChange={e => setDesc(e.target.value)}></textarea></div>
+                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Thêm Biện pháp (mỗi dòng 1 ý)</label><textarea className="w-full border rounded p-2" rows="3" value={measure} onChange={e => setMeasure(e.target.value)}></textarea></div>
+                    </div>
+                    <div className="p-4 border-t flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 border rounded">Hủy</button><button onClick={handleSave} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">{loading ? "..." : "Lưu"}</button></div>
+                </div>
+            </div>
+        );
+    };
 
-        // --- FORM DATA ---
-        const [formData, setFormData] = useState({
-            // Header
-            donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ",
-            ngay: new Date().getDate(),
-            thang: new Date().getMonth() + 1,
-            nam: new Date().getFullYear(),
-            gioKhaoSat: "07:30",
-            
-            // Địa điểm chi tiết
-            loc_poleCode: "", 
-            loc_subCode: "",  
-            loc_lineName: "", 
-            loc_commune: "", 
+    const RiskSelectModal = ({ isOpen, onClose, title, options, selectedValues, onSave }) => {
+        const [items, setItems] = useState([]);
+        useEffect(() => { if (isOpen) setItems(selectedValues ? selectedValues.split(';').map(x => x.trim()).filter(x => x !== '') : []); }, [isOpen, selectedValues]);
+        const toggleOption = (val) => setItems(prev => prev.includes(val) ? prev.filter(i => i !== val) : [...prev, val]);
+        const handleSave = () => { onSave(items.join('; ')); onClose(); };
+        if (!isOpen) return null;
+        return (
+            <div className="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-4" onClick={onClose}>
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                    <div className="p-4 border-b bg-blue-50 flex justify-between items-center"><h3 className="font-bold text-blue-800">{title}</h3><button onClick={onClose}><UI_Icons.X/></button></div>
+                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                        <div className="mb-2"><div className="font-bold text-sm mb-1">Đã chọn:</div>{items.map((it, i) => (<div key={i} className="flex gap-2 mb-1"><textarea className="flex-1 border rounded p-1 text-sm" rows="1" value={it} onChange={e => { const n = [...items]; n[i] = e.target.value; setItems(n); }} /><button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="text-red-500"><UI_Icons.Trash2 size={16}/></button></div>))}</div>
+                        <button onClick={() => setItems([...items, ""])} className="text-sm text-blue-600 font-bold flex items-center gap-1"><UI_Icons.Plus size={14}/> Thêm dòng</button>
+                        <hr className="my-2"/>
+                        <div className="font-bold text-sm mb-1">Gợi ý:</div>
+                        <div className="space-y-1">{options.map((opt, i) => (<label key={i} className="flex gap-2 p-2 hover:bg-gray-100 rounded cursor-pointer"><input type="checkbox" checked={items.includes(opt.noi_dung)} onChange={() => toggleOption(opt.noi_dung)} /><span className="text-sm">{opt.noi_dung}</span></label>))}</div>
+                    </div>
+                    <div className="p-3 border-t flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 border rounded">Hủy</button><button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">Lưu</button></div>
+                </div>
+            </div>
+        );
+    };
 
-            // Nhân sự
-            dvct_daiDien1: "", dvct_chucVu1: "",
-            dvct_daiDien2: "", dvct_chucVu2: "",
-            qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "",
-            qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
-            dv_lienQuan: "",
+    // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (FINAL) ---
+    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport }) => {
+        const [reports, setReports] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [filterDate, setFilterDate] = useState(""); 
+        const [filterCode, setFilterCode] = useState("");
+        const [downloadedIds, setDownloadedIds] = useState([]);
 
-            // Nội dung
-            muc4_diaDiem: "",
-            muc5_noiDung: "Thay điện kế định kỳ",
-            muc6_phamVi: "",
-            muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", muc7_ngay: "2026-01-06",
-
-            // 8. Đánh giá rủi ro
-            ruiRo_ATLD: [
-                { moiNguy: "Phóng điện", moTa: "Điện hạ áp giật; Ngắn mạch pha - đất; hồ quang điện gây bỏng", bac: "II", bienPhap: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt" },
-                { moiNguy: "Ngã, lật xe", moTa: "Lún chân chống do không chèn chân kỹ", bac: "II", bienPhap: "Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp" },
-                { moiNguy: "Chấn thương đầu, TNGT", moTa: "Dụng cụ rơi rớt trúng người; Xe gây TNGT", bac: "II", bienPhap: "Đặt rào chắn xung quanh vị trí công tác, không cho người và phương tiện di chuyển vào khu vực công tác" },
-                { moiNguy: "Ngã cao", moTa: "Xe bị sự cố hoặc người công nhân không quàng dây an toàn", bac: "II", bienPhap: "Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao trên thùng xe gàu" },
-                { moiNguy: "Sức khỏe, tâm lý", moTa: "Sức khỏe không tốt, tâm lý không ổn định", bac: "II", bienPhap: "Kiểm tra lại sức khỏe của người lao động, ổn định tâm lý của anh em trong nhóm công tác" }
-            ],
-            ruiRo_VSLD: [
-                { moiNguy: "Say nắng", moTa: "Làm việc trong thời tiết nắng nóng nhiệt độ trên 35 độ", bac: "I", bienPhap: "Tránh làm việc khi thời tiết quá nóng (trên 35 độ C)" }
-            ],
-            ruiRo_ghiChu: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\nSử dụng tấm lót chèn chân chống đảm bảo cứng cáp\nĐặt rào chắn xung quanh vị trí công tác\nTuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\nTránh làm việc khi thời tiết quá nóng",
-
-            // 9. Trách nhiệm
-            muc9a_catDien: "", 
-            muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công, nhân lực thực hiện công việc.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện theo đúng thời gian đăng ký.",
-            muc9c_dieuDo: "",
-            muc9d_khac: "",
-            soBan: "02"
-        });
-
-        // --- FETCH DATA ---
         useEffect(() => {
-            lucide.createIcons();
-            
+            const updateDownloadedStatus = () => {
+                const downloaded = JSON.parse(localStorage.getItem('downloaded_reports') || '[]');
+                setDownloadedIds(downloaded);
+            };
+            if (isOpen) {
+                document.body.style.overflow = 'hidden'; 
+                fetchReports();
+                updateDownloadedStatus();
+                window.addEventListener('storage', updateDownloadedStatus);
+            } else {
+                document.body.style.overflow = '';
+            }
+            return () => { document.body.style.overflow = ''; window.removeEventListener('storage', updateDownloadedStatus); }
+        }, [isOpen]);
+
+        const fetchReports = async (searchCode = filterCode, searchDate = filterDate) => {
+            setLoading(true);
+            try {
+                let query = supabase.from('bien_ban_khao_sat').select('*').order('created_at', { ascending: false });
+                if (searchCode && searchCode.trim()) query = query.ilike('ma_tru', `%${searchCode.trim()}%`);
+                if (searchDate) {
+                    const startDate = new Date(searchDate); startDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(searchDate); endDate.setHours(23, 59, 59, 999);
+                    query = query.gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
+                }
+                const { data, error } = await query;
+                if (error) throw error;
+                setReports(data || []);
+            } catch (error) { alert("Lỗi tải danh sách: " + error.message); } finally { setLoading(false); }
+        };
+
+        const handleClearFilters = () => { setFilterCode(""); setFilterDate(""); fetchReports("", ""); };
+        
+        const handleDelete = async (id, e) => {
+            e.stopPropagation();
+            if(!confirm("Bạn có chắc muốn xóa biên bản này vĩnh viễn?")) return;
+            const { error } = await supabase.from('bien_ban_khao_sat').delete().eq('id', id);
+            if (error) alert("Lỗi xóa: " + error.message); else fetchReports();
+        };
+
+        const handleEditClick = (id) => { onLoad(id); };
+        
+        const handleExportClick = (report) => { 
+            if (onExport) {
+                onExport(report);
+                if (!downloadedIds.includes(report.id)) {
+                    setDownloadedIds([...downloadedIds, report.id]);
+                }
+            }
+        };
+        
+        const formatDateTime = (isoString) => {
+            if (!isoString) return "";
+            const date = new Date(isoString);
+            const d = date.getDate().toString().padStart(2, '0');
+            const m = (date.getMonth() + 1).toString().padStart(2, '0');
+            const y = date.getFullYear();
+            const h = date.getHours().toString().padStart(2, '0');
+            const min = date.getMinutes().toString().padStart(2, '0');
+            return `${d}/${m}/${y} - ${h}:${min}`;
+        };
+
+        if (!isOpen) return null;
+
+        return (
+            <div className="fixed inset-0 bg-gray-100 z-[9999] flex flex-col overflow-hidden" style={{ margin: 0, padding: 0 }}>
+                {/* HEADER */}
+                <div className="bg-white border-b px-3 py-2 shadow-sm flex items-center justify-between shrink-0 h-14 relative z-20">
+                    <h2 className="text-base font-bold text-blue-800 uppercase flex items-center gap-2">
+                        <UI_Icons.Database size={18} /> Kho Dữ Liệu
+                    </h2>
+                    <button onClick={onCreateNew} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full transition-colors shadow-md font-bold flex items-center gap-2 text-sm">
+                        <UI_Icons.Plus size={18} strokeWidth={3} /> Tạo Mới
+                    </button>
+                </div>
+
+                {/* FILTER BAR */}
+                <div className="bg-white p-2 border-b shrink-0 z-10 shadow-sm">
+                    <div className="max-w-4xl mx-auto flex gap-2 items-center">
+                        <div className="flex-1 relative">
+                            <input type="text" className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 outline-none focus:border-blue-500 font-bold text-gray-700 text-sm" placeholder="Tìm số trụ..." value={filterCode} onChange={(e) => setFilterCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchReports()} />
+                            <div className="absolute left-2.5 top-2 text-gray-400"><UI_Icons.ZoomIn size={16}/></div>
+                        </div>
+                        <input type="date" className="border border-gray-300 rounded px-2 py-1.5 outline-none font-medium text-sm w-32" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
+                        <button onClick={() => fetchReports()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded shadow text-sm">Tìm</button>
+                        {(filterDate || filterCode) && (<button onClick={handleClearFilters} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1.5 px-3 rounded" title="Hủy lọc"><UI_Icons.RotateCcw size={16}/></button>)}
+                    </div>
+                </div>
+
+                {/* DANH SÁCH */}
+                <div className="flex-1 overflow-y-auto bg-gray-100 p-2">
+                    <div className="max-w-4xl mx-auto pb-20">
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500 text-sm flex flex-col items-center gap-2"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div> Đang tải...</div>
+                        ) : reports.length === 0 ? (
+                            <div className="text-center py-10 bg-white rounded border border-gray-200 text-gray-400 italic text-sm">Chưa có biên bản nào. Bấm "Tạo Mới" để bắt đầu.</div>
+                        ) : (
+                            <div className="bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
+                                <div className="divide-y divide-gray-100">
+                                    {reports.map(r => {
+                                        const isDownloaded = downloadedIds.includes(r.id);
+                                        const btnClass = isDownloaded ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-green-700 hover:border-green-300";
+                                        return (
+                                            <div key={r.id} className="px-3 py-2.5 hover:bg-blue-50 transition-colors group cursor-default">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                        <div className="font-bold text-blue-800 text-base leading-tight mb-1 truncate">{r.ma_tru || "---"}</div>
+                                                        <div className="flex items-center text-sm text-gray-600 gap-2">
+                                                            <span className="truncate max-w-[140px] sm:max-w-[200px]" title={r.ten_tuyen}>{r.ten_tuyen || "(Chưa có tên tuyến)"}</span>
+                                                            <span className="text-gray-300">|</span>
+                                                            <span className="font-medium text-gray-700 whitespace-nowrap">{formatDateTime(r.created_at)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0 self-center">
+                                                        <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
+                                                        <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-2.5 py-1.5 border rounded text-[11px] font-bold active:scale-95 transition-all shadow-sm ${btnClass}`}><UI_Icons.Download size={14}/> Word</button>
+                                                        <button onClick={(e) => handleDelete(r.id, e)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded ml-1 transition-colors active:scale-95"><UI_Icons.Trash2 size={18}/></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const App = () => {
+        // --- 1. CÁC HÀM TIỆN ÍCH (DATE HELPER) ---
+        // Lấy ngày hôm nay chuẩn ISO (yyyy-mm-dd) cho input type="date"
+        const getTodayISO = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        // Chuyển đổi ngày từ ISO (yyyy-mm-dd) sang VN (dd/mm/yyyy) để xuất Word
+        const formatDateVN = (isoDate) => {
+            if (!isoDate) return ".../.../...";
+            const [y, m, d] = isoDate.split('-');
+            return `${d}/${m}/${y}`;
+        };
+
+        // --- 2. CẤU TRÚC DỮ LIỆU MẶC ĐỊNH (Quan trọng để sửa lỗi sửa 1 bị hết) ---
+        const DEFAULT_FORM_DATA = {
+            donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ", 
+            ngay: new Date().getDate(), thang: new Date().getMonth() + 1, nam: new Date().getFullYear(), gioKhaoSat: "07:30",
+            loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
+            dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
+            qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "", qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
+            dv_lienQuan: "", muc4_diaDiem: "", muc5_noiDung: "Thay điện kế định kỳ", muc6_phamVi: "",
+            muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", 
+            muc7_ngay: getTodayISO(),       // Mặc định ngày hiện tại
+            phieu_dgrr_ngay: getTodayISO(), // Mặc định ngày hiện tại
+            ruiRo_ATLD: [{ riskId: 1, moiNguy: "Phóng điện", moTa: "Điện hạ áp giật", bac: "II", bienPhap: "Thực hiện biện pháp an toàn..." }],
+            ruiRo_VSLD: [{ riskId: null, moiNguy: "", moTa: "", bac: "", bienPhap: "" }],
+            ruiRo_ghiChu: "Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\nSử dụng tấm lót chèn chân chống đảm bảo cứng cáp\nĐặt rào chắn xung quanh vị trí công tác\nTuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\nTránh làm việc khi thời tiết quá nóng",
+            muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị...", muc9c_dieuDo: "", muc9d_khac: "", soBan: "02"
+        };
+
+        const [dbPoles, setDbPoles] = useState([]);
+        const [dbCommunes, setDbCommunes] = useState([{name: "Thạnh Mỹ Tây"}, {name: "Mỹ Đức"}]);
+        const [dbStaff, setDbStaff] = useState(["Cao Thành Tân", "Nguyễn Văn Tâm"]);
+        const [dbPositions, setDbPositions] = useState(["Chỉ huy trực tiếp", "Giám sát an toàn", "Tổ trưởng", "Kỹ thuật viên", "Công nhân", "Đội trưởng", "Đội phó"]);
+        const [dbUnits, setDbUnits] = useState(["Đội Quản lý điện Châu Phú", "Phòng Kỹ thuật an toàn"]);
+        const [showDiagram, setShowDiagram] = useState(false);
+        const [diagramData, setDiagramData] = useState([]);
+        const [riskLibrary, setRiskLibrary] = useState({ risks: [], descriptions: [], measures: [] });
+        const [modalConfig, setModalConfig] = useState({ isOpen: false, rowIndex: null, type: null, listType: null, options: [] });
+        const [showReportList, setShowReportList] = useState(true);
+        const [showRiskManager, setShowRiskManager] = useState(false);
+        const [currentReportId, setCurrentReportId] = useState(null);
+        
+        // Khởi tạo form với dữ liệu mặc định copy
+        const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
+
+        const fetchRiskLibrary = async () => {
+            const { data: risks } = await supabase.from('dm_moi_nguy').select('*');
+            const { data: descs } = await supabase.from('dm_mo_ta').select('*');
+            const { data: measures } = await supabase.from('dm_bien_phap').select('*');
+            if (risks && risks.length > 0) { setRiskLibrary({ risks, descriptions: descs || [], measures: measures || [] }); }
+        };
+
+        useEffect(() => {
             const fetchData = async () => {
-                const { data: poles } = await supabase.from('poles').select('code, line_name');
-                if (poles) setDbPoles(poles); else setDbPoles([{code: "478CD", line_name: "478 Cái Dầu"}]); 
-                
-                const { data: communes } = await supabase.from('communes').select('name');
-                if (communes) setDbCommunes(communes); else setDbCommunes([{name: "Thạnh Mỹ Tây"}, {name: "Mỹ Đức"}]);
-
-                const { data: staffs } = await supabase.from('staff').select('name');
-                if (staffs) setDbStaff(staffs.map(s => s.name)); else setDbStaff(["Cao Thành Tân", "Nguyễn Văn Tâm"]);
-
-                const { data: positions } = await supabase.from('positions').select('name');
-                if (positions) setDbPositions(positions.map(p => p.name)); else setDbPositions(["Chỉ huy trực tiếp", "Giám sát an toàn", "Tổ trưởng", "Kỹ thuật viên", "Công nhân", "Đội trưởng", "Đội phó"]);
-
-                const { data: units } = await supabase.from('units').select('name');
-                if (units) setDbUnits(units.map(u => u.name)); else setDbUnits(["Đội Quản lý điện Châu Phú", "Phòng Kỹ thuật an toàn"]);
+                const { data: poles } = await supabase.from('poles').select('code, line_name'); if (poles) setDbPoles(poles); else setDbPoles([{code: "478CD", line_name: "478 Cái Dầu"}]); 
+                const { data: communes } = await supabase.from('communes').select('name'); if (communes) setDbCommunes(communes); 
+                const { data: staffData } = await supabase.from('staff').select('name, position, unit');
+                if (staffData && staffData.length > 0) {
+                    setDbStaff(staffData.map(s => s.name));
+                    setDbPositions([...new Set(staffData.map(s => s.position).filter(p => p))]);
+                    setDbUnits([...new Set(staffData.map(s => s.unit).filter(u => u))]);
+                }
+                await fetchRiskLibrary();
             };
             fetchData();
         }, []);
 
-        const handlePoleChange = (e) => {
-            const selectedCode = e.target.value;
-            const found = dbPoles.find(p => p.code === selectedCode);
-            setFormData(prev => ({
-                ...prev,
-                loc_poleCode: selectedCode,
-                loc_lineName: found ? found.line_name : ""
-            }));
-        };
-
-        const tags9a = [
-            { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" },
-            { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" },
-            { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" },
-            { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, // Đã thêm tuyến
-            { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" },
-            { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" }
-        ];
-
-        const tags9b = [
-            { label: "Mẫu chuẩn", content: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ." },
-            { label: "Thêm dây an toàn", content: "- Sử dụng dây an toàn 2 móc khi leo cao." },
-            { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." }
-        ];
-
-        const handleExport = () => { console.log("Dữ liệu xuất:", formData); alert("Đã lưu dữ liệu! Sẵn sàng xuất file."); };
-
-        const updateRiskRow = (type, index, field, value) => {
-            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
-            const newRisks = [...formData[listKey]];
-            newRisks[index][field] = value;
-            setFormData({...formData, [listKey]: newRisks});
-        };
-
-        const addRiskRow = (type) => {
-            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
-            setFormData({
-                ...formData, 
-                [listKey]: [...formData[listKey], { moiNguy: "", moTa: "", bac: "", bienPhap: "" }]
+        const handlePoleChange = (e) => { const selectedCode = e.target.value; const found = dbPoles.find(p => p.code === selectedCode); setFormData(prev => ({ ...prev, loc_poleCode: selectedCode, loc_lineName: found ? found.line_name : "" })); };
+        const tags9a = [ { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" }, { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" }, { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" }, { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" }, { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" } ];
+        const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ." }, { label: "Thêm dây an toàn", content: "- Sử dụng dây an toàn 2 móc khi leo cao." }, { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." } ];
+        const getContextData = () => { return { code: formData.loc_poleCode, sub: formData.loc_subCode, line: formData.loc_lineName }; };
+        
+        const generateDiagramImage = async (data) => {
+            if (!data || data.length === 0) return null;
+            return new Promise((resolve) => {
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                data.forEach(obj => { if (obj.type === 'line') { minX = Math.min(minX, obj.x1, obj.x2); maxX = Math.max(maxX, obj.x1, obj.x2); minY = Math.min(minY, obj.y1, obj.y2); maxY = Math.max(maxY, obj.y1, obj.y2); } else if (obj.type === 'rect_pvlv') { minX = Math.min(minX, obj.x); maxX = Math.max(maxX, obj.x + obj.width); minY = Math.min(minY, obj.y); maxY = Math.max(maxY, obj.y + obj.height); } else { const cx = obj.x !== undefined ? obj.x : obj.cx; const cy = obj.y !== undefined ? obj.y : obj.cy; const size = 40; minX = Math.min(minX, cx - size); maxX = Math.max(maxX, cx + size); minY = Math.min(minY, cy - size); maxY = Math.max(maxY, cy + size); } });
+                const padding = 50; minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+                const width = maxX - minX; const height = maxY - minY;
+                let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" style="background-color: white;">`;
+                data.forEach(obj => {
+                    if(obj.type === 'line') svgContent += `<line x1="${obj.x1}" y1="${obj.y1}" x2="${obj.x2}" y2="${obj.y2}" stroke="black" stroke-width="${obj.strokeWidth}" stroke-dasharray="${obj.dash?'5,5':'none'}" />`;
+                    if(obj.type === 'circle') svgContent += `<circle cx="${obj.cx}" cy="${obj.cy}" r="4" fill="black" />`;
+                    if(obj.type === 'text') svgContent += `<text x="${obj.x}" y="${obj.y}" font-family="Arial" font-size="${obj.fontSize}" transform="rotate(${obj.rotate||0}, ${obj.x}, ${obj.y})">${obj.text}</text>`;
+                    if(obj.type === 'icon_device') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`; if(['FCO', 'LBFCO'].includes(obj.subType)) svgContent += `<line x1="-20" y1="-20" x2="20" y2="20" stroke="black" stroke-width="2"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" stroke-width="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill="${obj.subType==='LBFCO'?'black':'none'}" stroke="black" stroke-width="2"/>`; else svgContent += `<rect x="-15" y="-15" width="30" height="30" fill="white" stroke="black" stroke-width="2"/><line x1="-15" y1="-15" x2="15" y2="15" stroke="black" stroke-width="2"/><line x1="15" y1="-15" x2="-15" y2="15" stroke="black" stroke-width="2"/>`; svgContent += `<text x="20" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`; }
+                    if(obj.type === 'icon_load') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`; if(obj.subType === 'TBA') svgContent += `<circle cx="0" cy="0" r="18" fill="white" stroke="black" stroke-width="2"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" stroke-width="2"/>`; else svgContent += `<rect x="-18" y="-25" width="36" height="50" fill="white" stroke="black" stroke-width="2"/>`; svgContent += `<text x="25" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`; }
+                    if(obj.type === 'icon_ground') { const dx = obj.direction === 'left' ? -20 : 20; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><line x1="${dx}" y1="-20" x2="0" y2="0" stroke="black" stroke-width="2"/><circle cx="${dx}" cy="-20" r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" stroke-width="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" stroke-width="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" stroke-width="2"/></g>`; }
+                    if(obj.type === 'icon_ground_lv') { const barX = obj.direction === 'left' ? -10 : 10; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><circle cx="0" cy="0" r="2" fill="black"/><line x1="0" y1="0" x2="${barX}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-8}" y1="10" x2="${barX+8}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-5}" y1="13" x2="${barX+5}" y2="13" stroke="black" stroke-width="1.5"/><line x1="${barX-2}" y1="16" x2="${barX+2}" y2="16" stroke="black" stroke-width="1.5"/></g>`; }
+                    if(obj.type === 'rect_pvlv') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><rect width="${obj.width}" height="${obj.height}" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5"/><text x="5" y="15" fill="#ef4444" font-size="10" font-weight="bold">PVLV</text></g>`; }
+                });
+                svgContent += `</svg>`;
+                const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); const img = new Image();
+                img.onload = () => { ctx.drawImage(img, 0, 0); resolve({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height }); };
+                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgContent)));
             });
         };
 
-        const removeRiskRow = (type, index) => {
-            const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD';
-            const newRisks = formData[listKey].filter((_, i) => i !== index);
-            setFormData({...formData, [listKey]: newRisks});
+        // --- HÀM XUẤT WORD (FINAL: TỌA ĐỘ ĐƯỜNG KẺ SÁT + SPACING NGÀY 12PT) ---
+        const handleExportDocx = async (targetReport = null) => {
+            const sourceForm = targetReport ? targetReport.du_lieu_form : formData;
+            const sourceDiagram = targetReport ? targetReport.du_lieu_so_do : diagramData;
+            
+            // 1. CẤU HÌNH TÊN FILE
+            const d = String(sourceForm.ngay).padStart(2, '0');
+            const m = String(sourceForm.thang).padStart(2, '0');
+            const y = sourceForm.nam;
+            const cleanTuyen = (sourceForm.loc_lineName || "").replace(/[\\/:*?"<>|]/g, "_");
+            let rawTru = sourceForm.loc_poleCode || "Moi";
+            if (sourceForm.loc_subCode) rawTru += "/" + sourceForm.loc_subCode;
+            const cleanTru = rawTru.replace(/\//g, ".").replace(/[\\:*?"<>|]/g, "_");
+            const filename = `${d}-${m}-${y}-${cleanTuyen}-${cleanTru}.docx`;
+
+            // 2. LƯU TRẠNG THÁI
+            if (targetReport && targetReport.id) {
+                const downloaded = JSON.parse(localStorage.getItem('downloaded_reports') || '[]');
+                if (!downloaded.includes(targetReport.id)) {
+                    downloaded.push(targetReport.id);
+                    localStorage.setItem('downloaded_reports', JSON.stringify(downloaded));
+                    window.dispatchEvent(new Event('storage'));
+                }
+            }
+
+            // --- HELPER: TẠO ẢNH ĐƯỜNG KẺ ---
+            const createLineBuffer = async (widthPx) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = widthPx;
+                canvas.height = 2; // Độ dày nét
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = "black";
+                ctx.fillRect(0, 0, widthPx, 2);
+                
+                const dataUrl = canvas.toDataURL("image/png");
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                return await blob.arrayBuffer();
+            };
+
+            const lineShort = await createLineBuffer(80); 
+            const lineLong = await createLineBuffer(210);
+
+            // 3. TẠO FILE WORD
+            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, TextWrappingSide } = window.docx;
+            let diagramImage = null, imgWidth = 600, imgHeight = 400;
+            
+            if (sourceDiagram && sourceDiagram.length > 0) {
+                try {
+                    const { dataUrl, width, height } = await generateDiagramImage(sourceDiagram);
+                    const res = await fetch(dataUrl); const blob = await res.blob(); const buffer = await blob.arrayBuffer();
+                    diagramImage = buffer; const MAX_WIDTH = 600; imgWidth = Math.min(width, MAX_WIDTH); imgHeight = (height / width) * imgWidth;
+                } catch (e) {}
+            }
+            
+            // Hàm tạo đoạn văn bản
+            const createPara = (text, isBold = false, fontSize = 24, align = AlignmentType.LEFT, isItalic = false) => {
+                return new Paragraph({
+                    children: [ new TextRun({ text: text, bold: isBold, size: fontSize, font: "Times New Roman", italics: isItalic }) ],
+                    alignment: align,
+                    spacing: { after: 50, before: 50 }
+                });
+            };
+
+            const formatMultilineText = (text) => { 
+                if (!text) return [createPara("")]; 
+                return text.split('\n').map(line => createPara(line.trim())); 
+            };
+
+            // Format ngày tháng hiển thị Word
+            const dateMuc7 = formatDateVN(sourceForm.muc7_ngay);
+            const datePhieu = formatDateVN(sourceForm.phieu_dgrr_ngay);
+
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        // --- HEADER TABLE ---
+                        new Table({ 
+                            width: { size: 100, type: WidthType.PERCENTAGE }, 
+                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} }, 
+                            rows: [new TableRow({ children: [ 
+                                // CỘT TRÁI
+                                new TableCell({ children: [
+                                    createPara("CÔNG TY ĐIỆN LỰC AN GIANG", false, 24, AlignmentType.CENTER),
+                                    
+                                    // ĐƠN VỊ + LINE NGẮN (Đã chỉnh offset lên 180000)
+                                    new Paragraph({
+                                        children: [
+                                            new TextRun({ text: sourceForm.donVi.toUpperCase(), bold: true, size: 24, font: "Times New Roman" }),
+                                            new window.docx.ImageRun({
+                                                data: lineShort,
+                                                transformation: { width: 80, height: 1 },
+                                                floating: {
+                                                    horizontalPosition: { relative: HorizontalPositionRelativeFrom.COLUMN, align: AlignmentType.CENTER },
+                                                    verticalPosition: { 
+                                                        relative: VerticalPositionRelativeFrom.PARAGRAPH, 
+                                                        offset: 180000 // TỌA ĐỘ MỚI
+                                                    },
+                                                    wrap: { type: TextWrappingType.NONE, side: TextWrappingSide.BOTH }
+                                                }
+                                            })
+                                        ],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 50, after: 100 }
+                                    })
+                                ] }), 
+                                // CỘT PHẢI
+                                new TableCell({ children: [
+                                    createPara("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", true, 24, AlignmentType.CENTER),
+                                    
+                                    // ĐỘC LẬP... + LINE DÀI (Đã chỉnh offset lên 200000)
+                                    new Paragraph({
+                                        children: [
+                                            new TextRun({ text: "Độc lập - Tự do - Hạnh phúc", bold: true, size: 26, font: "Times New Roman" }),
+                                            new window.docx.ImageRun({
+                                                data: lineLong,
+                                                transformation: { width: 210, height: 1 },
+                                                floating: {
+                                                    horizontalPosition: { relative: HorizontalPositionRelativeFrom.COLUMN, align: AlignmentType.CENTER },
+                                                    verticalPosition: { 
+                                                        relative: VerticalPositionRelativeFrom.PARAGRAPH, 
+                                                        offset: 200000 // TỌA ĐỘ MỚI
+                                                    },
+                                                    wrap: { type: TextWrappingType.NONE, side: TextWrappingSide.BOTH }
+                                                }
+                                            })
+                                        ],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 50, after: 50 }
+                                    }),
+                                    
+                                    // NGÀY THÁNG (Đã chỉnh spacing before = 240 ~ 12pt)
+                                    new Paragraph({
+                                        children: [new TextRun({ text: `Châu Phú, ngày ${sourceForm.ngay} tháng ${sourceForm.thang} năm ${sourceForm.nam}`, italics: true, size: 24, font: "Times New Roman" })],
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 240, after: 50 } 
+                                    })
+                                ] }), 
+                            ]})], 
+                        }),
+                        
+                        // --- NỘI DUNG CHÍNH (Giữ nguyên) ---
+                        createPara("", false, 24), 
+                        createPara("BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG", true, 28, AlignmentType.CENTER),
+                        createPara("", false, 24),
+                        
+                        createPara(`Vào hồi ${sourceForm.gioKhaoSat}, tại trụ ${sourceForm.loc_poleCode}/${sourceForm.loc_subCode} tuyến ${sourceForm.loc_lineName}, xã ${sourceForm.loc_commune}, tỉnh An Giang.`, false, 24, AlignmentType.JUSTIFIED),
+                        
+                        createPara("Chúng tôi gồm:", true, 24),
+                        createPara("1. Đại diện Đơn vị công tác:", true, 24), 
+                        createPara(`   1.1 Ông (Bà): ${sourceForm.dvct_daiDien1} - Chức vụ: ${sourceForm.dvct_chucVu1}`, false, 24), 
+                        createPara(`   1.2 Ông (Bà): ${sourceForm.dvct_daiDien2} - Chức vụ: ${sourceForm.dvct_chucVu2}`, false, 24),
+                        
+                        createPara("2. Đại diện (các) Đơn vị QLVH:", true, 24), 
+                        createPara(`   2.1 Ông (Bà): ${sourceForm.qlvh_daiDien1} - Chức vụ: ${sourceForm.qlvh_chucVu1} - Đơn vị: ${sourceForm.qlvh_donVi1}`, false, 24), 
+                        createPara(`   2.2 Ông (Bà): ${sourceForm.qlvh_daiDien2} - Chức vụ: ${sourceForm.qlvh_chucVu2} - Đơn vị: ${sourceForm.qlvh_donVi2}`, false, 24),
+                        
+                        createPara(`3. Đại diện các đơn vị có liên quan: ${sourceForm.dv_lienQuan}`, true, 24),
+                        
+                        new Paragraph({ children: [new TextRun({ text: "Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:", italics: true, size: 24, font: "Times New Roman" })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }),
+                        
+                        // Mục 4
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "4. Địa điểm (hoặc thiết bị) thực hiện công việc: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: sourceForm.muc4_diaDiem + ".", bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
+
+                        // Mục 5
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "5. Nội dung công việc: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: sourceForm.muc5_noiDung + ".", bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
+
+                        // Mục 6
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "6. Phạm vi làm việc: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: sourceForm.muc6_phamVi + ".", bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
+
+                        // Mục 7
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "7. Thời gian tiến hành công việc: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ 
+                                    text: `Từ ${sourceForm.muc7_thoiGianTu} đến ${sourceForm.muc7_thoiGianDen}, ngày ${dateMuc7}.`, 
+                                    bold: false, size: 24, font: "Times New Roman" 
+                                })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
+
+                        createPara("8. Kết quả Đánh giá rủi ro của đơn vị công tác:", true, 24),
+                        // DÒNG PHIẾU ĐGRR MỚI THÊM
+                        createPara(`a) Kết quả ĐGRR tại hiện trường (Theo Phiếu ĐGRR ngày ${datePhieu})`, false, 24),
+
+                        new Table({ 
+                            width: { size: 100, type: WidthType.PERCENTAGE }, 
+                            rows: [ 
+                                new TableRow({ children: ["Stt", "Nhận diện mối nguy", "Mô tả mối nguy", "Bậc RR", "Biện pháp kiểm soát"].map(text => new TableCell({ children: [createPara(text, true, 24, AlignmentType.CENTER)], shading: { fill: "f3f4f6" } })) }), 
+                                
+                                // Dòng ATLĐ: Căn giữa, Bỏ tô màu
+                                new TableRow({ children: [new TableCell({ children: [createPara("ATLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
+                                
+                                ...sourceForm.ruiRo_ATLD.map((item, idx) => new TableRow({ children: [
+                                    new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara(item.moiNguy)] }), 
+                                    new TableCell({ children: [createPara(item.moTa)] }), 
+                                    new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara(item.bienPhap)] })
+                                ] })), 
+                                
+                                // Dòng VSLĐ: Căn giữa, Bỏ tô màu
+                                new TableRow({ children: [new TableCell({ children: [createPara("VSLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
+                                
+                                ...sourceForm.ruiRo_VSLD.map((item, idx) => new TableRow({ children: [
+                                    new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara(item.moiNguy)] }), 
+                                    new TableCell({ children: [createPara(item.moTa)] }), 
+                                    new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara(item.bienPhap)] })
+                                ] })), 
+                            ] 
+                        }),
+                        
+                        createPara("b) Ghi chú:", true, 24), ...formatMultilineText(sourceForm.ruiRo_ghiChu), createPara("", false, 24),
+                        
+                        createPara("9. Trách nhiệm của các đơn vị liên quan:", true, 24),
+                        createPara("a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):", false, 24), ...formatMultilineText(sourceForm.muc9a_catDien),
+                        createPara("b/ Đối với đơn vị công tác (Biện pháp an toàn):", false, 24), ...formatMultilineText(sourceForm.muc9b_anToan),
+                        createPara("c/ Đối với (các) đơn vị điều độ:", false, 24), ...formatMultilineText(sourceForm.muc9c_dieuDo),
+                        createPara("d/ Những nội dung khác:", false, 24), ...formatMultilineText(sourceForm.muc9d_khac),
+                        createPara("", false, 24),
+                        
+                        createPara(`Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp thống nhất thông qua.`, false, 24, AlignmentType.JUSTIFIED),
+                        createPara("", false, 24),
+                        
+                        // Chữ ký
+                        new Table({ 
+                            width: { size: 100, type: WidthType.PERCENTAGE }, 
+                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} }, 
+                            rows: [ 
+                                new TableRow({ children: [ 
+                                    new TableCell({ children: [createPara("ĐẠI DIỆN ĐƠN VỊ LÀM CÔNG VIỆC", true, 24, AlignmentType.CENTER)] }), 
+                                    new TableCell({ children: [createPara("ĐẠI DIỆN ĐƠN VỊ QLVH", true, 24, AlignmentType.CENTER)] }) 
+                                ] }), 
+                                new TableRow({ children: [ 
+                                    new TableCell({ children: [
+                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
+                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
+                                        createPara(sourceForm.dvct_daiDien1, true, 24, AlignmentType.CENTER)
+                                    ] }), 
+                                    new TableCell({ children: [
+                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true), 
+                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24), 
+                                        createPara(sourceForm.qlvh_daiDien1, true, 24, AlignmentType.CENTER)
+                                    ] }) 
+                                ] }) 
+                            ] 
+                        }),
+                        
+                        createPara("", false, 24), createPara("", false, 24),
+                        createPara("SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC", true, 24, AlignmentType.CENTER),
+                        diagramImage ? new Paragraph({ children: [ new window.docx.ImageRun({ data: diagramImage, transformation: { width: imgWidth, height: imgHeight } }) ], alignment: AlignmentType.CENTER }) : createPara("(Chưa có sơ đồ)", false, 24, AlignmentType.CENTER, true)
+                    ]
+                }]
+            });
+            Packer.toBlob(doc).then(blob => { saveAs(blob, filename); });
         };
 
-        const getContextData = () => {
-            return { 
-                code: formData.loc_poleCode, 
-                sub: formData.loc_subCode, 
-                line: formData.loc_lineName 
-            };
+        const handleSaveCloud = async () => {
+            if (!confirm("Bạn có đồng ý lưu biên bản này và thoát ra màn hình chính không?")) return;
+            if (!formData.loc_poleCode) { alert("Vui lòng nhập Mã trụ trước khi lưu!"); return; }
+            const payload = { ma_tru: formData.loc_poleCode + (formData.loc_subCode ? '/' + formData.loc_subCode : ''), ten_tuyen: formData.loc_lineName, du_lieu_form: formData, du_lieu_so_do: diagramData, updated_at: new Date().toISOString() };
+            let error;
+            if (currentReportId) { const res = await supabase.from('bien_ban_khao_sat').update(payload).eq('id', currentReportId); error = res.error; } 
+            else { const res = await supabase.from('bien_ban_khao_sat').insert([payload]).select(); error = res.error; }
+            if (error) alert("Lỗi khi lưu: " + error.message);
+            else { alert("Đã lưu thành công!"); setShowReportList(true); }
         };
+
+        const handleLoadReport = async (id) => {
+            const { data, error } = await supabase.from('bien_ban_khao_sat').select('*').eq('id', id).single();
+            if (error) { alert("Lỗi tải biên bản: " + error.message); } 
+            else if (data) { 
+                const savedForm = data.du_lieu_form || {};
+                setFormData({ 
+                    ...DEFAULT_FORM_DATA, 
+                    ...savedForm,
+                    phieu_dgrr_ngay: savedForm.phieu_dgrr_ngay || getTodayISO(),
+                    muc7_ngay: savedForm.muc7_ngay || getTodayISO()
+                }); 
+                setDiagramData(data.du_lieu_so_do || []); 
+                setCurrentReportId(data.id); 
+                setShowReportList(false); 
+            }
+        };
+
+        const handleCreateNew = () => {
+            setFormData({ ...DEFAULT_FORM_DATA, phieu_dgrr_ngay: getTodayISO(), muc7_ngay: getTodayISO() });
+            setDiagramData([]); setCurrentReportId(null); setShowReportList(false);
+        };
+
+        const handleRiskTypeChange = (listKey, index, e) => {
+            const riskId = parseInt(e.target.value); const riskObj = riskLibrary.risks.find(r => r.id === riskId); const newRisks = [...formData[listKey]];
+            newRisks[index] = { ...newRisks[index], riskId: riskId, moiNguy: riskObj ? riskObj.ten_moi_nguy : "", bac: riskObj ? riskObj.bac_rr_mac_dinh : "", moTa: "", bienPhap: "" };
+            setFormData({ ...formData, [listKey]: newRisks });
+        };
+        const openRiskModal = (listKey, index, field) => { const currentRow = formData[listKey][index]; const riskId = currentRow.riskId; if (!riskId) { alert("Vui lòng chọn 'Nhận diện mối nguy' trước."); return; } let options = field === 'moTa' ? riskLibrary.descriptions.filter(d => d.moi_nguy_id === riskId) : riskLibrary.measures.filter(m => m.moi_nguy_id === riskId); setModalConfig({ isOpen: true, rowIndex: index, type: field, listType: listKey, options: options, title: field === 'moTa' ? `Mô tả: ${currentRow.moiNguy}` : `Biện pháp: ${currentRow.moiNguy}`, currentValue: currentRow[field] }); };
+        const saveModalSelection = (value) => { const { listType, rowIndex, type } = modalConfig; const newRisks = [...formData[listType]]; newRisks[rowIndex][type] = value; setFormData({ ...formData, [listType]: newRisks }); };
+        const updateRiskRowManual = (listKey, index, field, value) => { const newRisks = [...formData[listKey]]; newRisks[index][field] = value; setFormData({ ...formData, [listKey]: newRisks }); };
+        const addRiskRow = (type) => { const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD'; setFormData({ ...formData, [listKey]: [...formData[listKey], { riskId: "", moiNguy: "", moTa: "", bac: "", bienPhap: "" }] }); };
+        const removeRiskRow = (type, index) => { const listKey = type === 'ATLD' ? 'ruiRo_ATLD' : 'ruiRo_VSLD'; const newRisks = formData[listKey].filter((_, i) => i !== index); setFormData({...formData, [listKey]: newRisks}); };
 
         return (
             <div className="pb-20">
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                    <div className="text-xs text-gray-500">Mẫu 04 - KSHT</div>
-                    <button onClick={handleExport} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 active:bg-blue-700">
-                        <i data-lucide="save"></i> Lưu & Xuất
-                    </button>
+                {showDiagram && <DiagramEditor initialData={diagramData} onSave={(data) => setDiagramData(data)} onClose={() => setShowDiagram(false)} />}
+                <RiskSelectModal isOpen={modalConfig.isOpen} onClose={() => setModalConfig({...modalConfig, isOpen: false})} title={modalConfig.title} options={modalConfig.options} selectedValues={modalConfig.currentValue} onSave={saveModalSelection} />
+                <ReportListPage isOpen={showReportList} onCreateNew={handleCreateNew} onLoad={handleLoadReport} onExport={handleExportDocx} />
+                <RiskManagerModal isOpen={showRiskManager} onClose={() => setShowRiskManager(false)} onRefresh={fetchRiskLibrary} existingRisks={riskLibrary.risks} />
+
+                <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                    <div className="text-xs text-gray-500 font-medium">{currentReportId ? <span className="text-blue-600 font-bold">Đang sửa: {formData.loc_poleCode}</span> : "Đang tạo mới"}</div>
+                    <div className="flex gap-2">
+                        <button onClick={() => { if(confirm("Dữ liệu chưa lưu sẽ mất. Bạn chắc chắn muốn thoát?")) setShowReportList(true); }} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm">Hủy/Thoát</button>
+                        <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
+                        <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
+                        <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
+                    </div>
                 </div>
 
                 <div className="a4-paper">
-                    {/* HEADER */}
-                    <div className="flex justify-between mb-6 text-center text-sm">
-                        <div className="w-1/2">
-                            <div className="font-bold uppercase">CÔNG TY ĐIỆN LỰC AN GIANG</div>
-                            <input className="input-line text-center uppercase font-bold" value={formData.donVi} onChange={e => setFormData({...formData, donVi: e.target.value})} />
-                            <hr className="w-1/3 mx-auto mt-1 border-gray-400" />
-                        </div>
-                        <div className="w-1/2">
-                            <div className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                            <div className="font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</div>
-                            <div className="mt-2 italic">
-                                Châu Phú, ngày <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.ngay} onChange={e => setFormData({...formData, ngay: e.target.value})} />
-                                tháng <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.thang} onChange={e => setFormData({...formData, thang: e.target.value})} />
-                                năm <input type="number" className="w-12 text-center border-b border-gray-300 outline-none" value={formData.nam} onChange={e => setFormData({...formData, nam: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-
+                    <div className="flex justify-between mb-6 text-center text-sm"><div className="w-1/2"><div className="font-bold uppercase">CÔNG TY ĐIỆN LỰC AN GIANG</div><input className="input-line text-center uppercase font-bold" value={formData.donVi} onChange={e => setFormData({...formData, donVi: e.target.value})} /><hr className="w-1/3 mx-auto mt-1 border-gray-400" /></div><div className="w-1/2"><div className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div><div className="font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</div><div className="mt-2 italic">Châu Phú, ngày <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.ngay} onChange={e => setFormData({...formData, ngay: e.target.value})} /> tháng <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.thang} onChange={e => setFormData({...formData, thang: e.target.value})} /> năm <input type="number" className="w-12 text-center border-b border-gray-300 outline-none" value={formData.nam} onChange={e => setFormData({...formData, nam: e.target.value})} /></div></div></div>
                     <h1 className="text-xl font-bold text-center mb-4 uppercase">BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG</h1>
-
-                    {/* VỊ TRÍ KHẢO SÁT */}
-                    <div className="mb-4 text-justify flex flex-wrap items-end gap-1 text-[15px] leading-7">
-                        <span>Vào hồi</span>
-                        <div className="mx-1"><TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} /></div>
-                        
-                        <span>tại trụ</span>
-                        
-                        {/* 1. Mã Trụ: MỞ RỘNG NHIỀU HƠN (200px) */}
-                        <input list="pole-list" 
-                               className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" 
-                               value={formData.loc_poleCode} 
-                               onChange={handlePoleChange} 
-                               placeholder="Chọn/Nhập mã..." />
-                        
-                        <span>/</span>
-                        {/* 2. Số phụ */}
-                        <input className="border-b border-gray-300 outline-none font-bold w-45 text-center" 
-                               value={formData.loc_subCode} 
-                               onChange={e => setFormData({...formData, loc_subCode: e.target.value})} 
-                               placeholder="..." />
-                        
-                        <span>tuyến</span>
-                        
-                        {/* 3. Tên tuyến: THU GỌN LẠI (100px) */}
-                        <input list="line-list" 
-                               className="font-bold border-b border-gray-300 w-[180px] px-1 text-center text-blue-800 bg-transparent outline-none"
-                               value={formData.loc_lineName}
-                               onChange={e => setFormData({...formData, loc_lineName: e.target.value})}
-                               placeholder="..." />
-                        
-                        <span>, xã</span>
-                        
-                        {/* 4. Xã: Select */}
-                        <select className="border-b border-gray-300 font-bold bg-transparent outline-none min-w-[80px]"
-                                value={formData.loc_commune} 
-                                onChange={e => setFormData({...formData, loc_commune: e.target.value})}>
-                            <option value="">Chọn xã</option>
-                            {dbCommunes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
-                        <span>, tỉnh An Giang.</span>
-                    </div>
-
+                    <div className="mb-4 text-justify flex flex-wrap items-end gap-1 text-[15px] leading-7"><span>Vào hồi</span><div className="mx-1"><TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} /></div><span>tại trụ</span><input list="pole-list" className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Chọn/Nhập mã..." /><span>/</span><input className="border-b border-gray-300 outline-none font-bold w-45 text-center" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="..." /><span>tuyến</span><input list="line-list" className="font-bold border-b border-gray-300 w-[180px] px-1 text-center text-blue-800 bg-transparent outline-none" value={formData.loc_lineName} onChange={e => setFormData({...formData, loc_lineName: e.target.value})} placeholder="..." /><span>, xã</span><select className="border-b border-gray-300 font-bold bg-transparent outline-none min-w-[80px]" value={formData.loc_commune} onChange={e => setFormData({...formData, loc_commune: e.target.value})}><option value="">Chọn xã</option>{dbCommunes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><span>, tỉnh An Giang.</span></div>
                     <div className="mb-2 font-bold">Chúng tôi gồm:</div>
+                    <datalist id="pole-list">{dbPoles.map(p => <option key={p.code} value={p.code} />)}</datalist><datalist id="line-list">{[...new Set(dbPoles.map(p => p.line_name))].map((l, i) => <option key={i} value={l} />)}</datalist><datalist id="staff-list">{dbStaff.map((name, i) => <option key={i} value={name} />)}</datalist><datalist id="position-list">{dbPositions.map((pos, i) => <option key={i} value={pos} />)}</datalist><datalist id="unit-list">{dbUnits.map((u, i) => <option key={i} value={u} />)}</datalist>
+                    <div className="mb-4 pl-4"><div className="font-bold">1. Đại diện Đơn vị công tác:</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2"><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})} placeholder="Chọn..." /></div></div><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})} placeholder="Chọn..." /></div></div></div></div>
+                    <div className="mb-4 pl-4"><div className="font-bold">2. Đại diện (các) Đơn vị QLVH:</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2"><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div></div></div><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">2.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2"><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div><div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div></div></div></div></div>
+                    <div className="mb-4 pl-4"><div className="font-bold">3. Đại diện các đơn vị có liên quan:</div><textarea className="input-line pl-4 resize-none" rows="2" value={formData.dv_lienQuan} onChange={e => setFormData({...formData, dv_lienQuan: e.target.value})} placeholder="..."></textarea></div>
+                    <div className="mb-4 italic text-justify text-black">Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:</div>
+                    <div className="space-y-3 mb-6"><div><span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span><textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea></div><div><span className="font-bold">5. Nội dung công việc:</span><input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} /></div><div><span className="font-bold">6. Phạm vi làm việc:</span><input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} /></div><div><span className="font-bold">7. Thời gian tiến hành công việc:</span><div className="flex flex-wrap items-center gap-2 mt-1">Từ <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianTu} onChange={(val) => setFormData({...formData, muc7_thoiGianTu: val})} /></div>đến <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianDen} onChange={(val) => setFormData({...formData, muc7_thoiGianDen: val})} /></div>, ngày <input type="date" className="border-b border-gray-300 font-bold bg-transparent outline-none px-1 text-blue-800" value={formData.muc7_ngay} onChange={e => setFormData({...formData, muc7_ngay: e.target.value})} /></div></div></div>
 
-                    {/* DATALISTS CHO AUTOCOMPLETE */}
-                    <datalist id="pole-list">{dbPoles.map(p => <option key={p.code} value={p.code} />)}</datalist>
-                    {/* Tạo danh sách tuyến duy nhất từ dbPoles để gợi ý */}
-                    <datalist id="line-list">{[...new Set(dbPoles.map(p => p.line_name))].map((l, i) => <option key={i} value={l} />)}</datalist>
-                    <datalist id="staff-list">{dbStaff.map((name, i) => <option key={i} value={name} />)}</datalist>
-                    <datalist id="position-list">{dbPositions.map((pos, i) => <option key={i} value={pos} />)}</datalist>
-                    <datalist id="unit-list">{dbUnits.map((u, i) => <option key={i} value={u} />)}</datalist>
+                    <div className="mb-6"><div className="font-bold mb-2">8. Kết quả Đánh giá rủi ro của đơn vị công tác:</div><div className="pl-4">
+                        <div className="font-semibold mb-2 flex flex-wrap items-center gap-1">a) Kết quả ĐGRR tại hiện trường (Theo Phiếu ĐGRR ngày <input type="date" className="border-b border-gray-400 outline-none px-1 font-bold bg-transparent text-blue-800" value={formData.phieu_dgrr_ngay} onChange={e => setFormData({...formData, phieu_dgrr_ngay: e.target.value})} />)</div>
+                        <table className="w-full"><thead><tr><th className="w-10">Stt</th><th className="w-1/4">Nhận diện mối nguy</th><th className="w-1/4">Mô tả mối nguy</th><th className="w-16">Bậc RR</th><th>Biện pháp kiểm soát</th><th className="w-8"></th></tr></thead><tbody><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">ATLĐ (An toàn lao động)</td></tr>{formData.ruiRo_ATLD.map((item, index) => (<tr key={`atld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-blue-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_ATLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai !== 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng ATLĐ</button></td></tr><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">VSLĐ (Vệ sinh lao động)</td></tr>{formData.ruiRo_VSLD.map((item, index) => (<tr key={`vsld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-green-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_VSLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai === 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng VSLĐ</button></td></tr></tbody></table><div className="font-semibold">b) Ghi chú:</div><textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea></div></div>
 
-                    {/* 1. ĐƠN VỊ CÔNG TÁC */}
-                    <div className="mb-4 pl-4">
-                        <div className="font-bold">1. Đại diện Đơn vị công tác:</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2">
-                            {/* 1.1 */}
-                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
-                                <div className="flex gap-2 items-center">
-                                    <span className="font-semibold text-sm">1.1 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." />
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                    <span className="text-sm">Chức vụ:</span>
-                                    <input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})} placeholder="Chọn..." />
-                                </div>
-                            </div>
-                            {/* 1.2 */}
-                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
-                                <div className="flex gap-2 items-center">
-                                    <span className="font-semibold text-sm">1.2 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." />
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                    <span className="text-sm">Chức vụ:</span>
-                                    <input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})} placeholder="Chọn..." />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 2. ĐƠN VỊ QLVH */}
-                    <div className="mb-4 pl-4">
-                        <div className="font-bold">2. Đại diện (các) Đơn vị QLVH:</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2">
-                            {/* 2.1 */}
-                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
-                                <div className="flex gap-2 items-center">
-                                    <span className="font-semibold text-sm">2.1 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien1} onChange={e => setFormData({...formData, qlvh_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." />
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu1} onChange={e => setFormData({...formData, qlvh_chucVu1: e.target.value})} placeholder="Chọn..." /></div>
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi1} onChange={e => setFormData({...formData, qlvh_donVi1: e.target.value})} placeholder="Chọn..." /></div>
-                                </div>
-                            </div>
-                            {/* 2.2 */}
-                            <div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300">
-                                <div className="flex gap-2 items-center">
-                                    <span className="font-semibold text-sm">2.2 Ông (Bà):</span>
-                                    <input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.qlvh_daiDien2} onChange={e => setFormData({...formData, qlvh_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." />
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line bg-transparent" value={formData.qlvh_chucVu2} onChange={e => setFormData({...formData, qlvh_chucVu2: e.target.value})} placeholder="Chọn..." /></div>
-                                    <div className="flex items-center w-1/2 gap-1"><span className="text-sm">Đơn vị:</span><input list="unit-list" className="input-line bg-transparent" value={formData.qlvh_donVi2} onChange={e => setFormData({...formData, qlvh_donVi2: e.target.value})} placeholder="Chọn..." /></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. ĐƠN VỊ LIÊN QUAN */}
-                    <div className="mb-4 pl-4">
-                        <div className="font-bold">3. Đại diện các đơn vị có liên quan:</div>
-                        <textarea className="input-line pl-4 resize-none" rows="2" value={formData.dv_lienQuan} onChange={e => setFormData({...formData, dv_lienQuan: e.target.value})} placeholder="..."></textarea>
-                    </div>
-
-                    <div className="mb-4 italic text-sm text-gray-600">
-                        Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:
-                    </div>
-
-                    {/* 4-7. NỘI DUNG */}
-                    <div className="space-y-3 mb-6">
-                        <div><span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span><textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea></div>
-                        <div><span className="font-bold">5. Nội dung công việc:</span><input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} /></div>
-                        <div><span className="font-bold">6. Phạm vi làm việc:</span><input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} /></div>
-                        <div><span className="font-bold">7. Thời gian tiến hành công việc:</span>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                Từ <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianTu} onChange={(val) => setFormData({...formData, muc7_thoiGianTu: val})} /></div>
-                                đến <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianDen} onChange={(val) => setFormData({...formData, muc7_thoiGianDen: val})} /></div>
-                                , ngày <input type="date" className="w-32 border-b border-gray-300 text-center font-bold" value={formData.muc7_ngay} onChange={e => setFormData({...formData, muc7_ngay: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 8. ĐÁNH GIÁ RỦI RO (Chia 2 phần, canh giữa tiêu đề) */}
-                    <div className="mb-6">
-                        <div className="font-bold mb-2">8. Kết quả Đánh giá rủi ro của đơn vị công tác:</div>
-                        <div className="pl-4">
-                            <div className="font-semibold mb-2">a) Kết quả ĐGRR tại hiện trường:</div>
-                            
-                            <table className="w-full">
-                                <thead>
-                                    <tr>
-                                        <th className="w-10">Stt</th>
-                                        <th className="w-1/4">Nhận diện mối nguy</th>
-                                        <th className="w-1/4">Mô tả mối nguy</th>
-                                        <th className="w-16">Bậc RR</th>
-                                        <th>Biện pháp kiểm soát</th>
-                                        <th className="w-8"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {/* PHẦN 1: ATLĐ */}
-                                    <tr>
-                                        <td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">
-                                            ATLĐ (An toàn lao động)
-                                        </td>
-                                    </tr>
-                                    {formData.ruiRo_ATLD.map((item, index) => (
-                                        <tr key={`atld-${index}`}>
-                                            <td className="text-center">{index + 1}</td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moiNguy} onChange={(e) => updateRiskRow('ATLD', index, 'moiNguy', e.target.value)}></textarea></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moTa} onChange={(e) => updateRiskRow('ATLD', index, 'moTa', e.target.value)}></textarea></td>
-                                            <td><input className="w-full text-center border-none outline-none bg-transparent" value={item.bac} onChange={(e) => updateRiskRow('ATLD', index, 'bac', e.target.value)} /></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.bienPhap} onChange={(e) => updateRiskRow('ATLD', index, 'bienPhap', e.target.value)}></textarea></td>
-                                            <td className="text-center align-middle">
-                                                <button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><i data-lucide="trash-2" width="16"></i></button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    <tr>
-                                        <td colSpan="6" className="text-center p-1">
-                                            <button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full">
-                                                <i data-lucide="plus" width="14"></i> Thêm dòng ATLĐ
-                                            </button>
-                                        </td>
-                                    </tr>
-
-                                    {/* PHẦN 2: VSLĐ */}
-                                    <tr>
-                                        <td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">
-                                            VSLĐ (Vệ sinh lao động)
-                                        </td>
-                                    </tr>
-                                    {formData.ruiRo_VSLD.map((item, index) => (
-                                        <tr key={`vsld-${index}`}>
-                                            <td className="text-center">{index + 1}</td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moiNguy} onChange={(e) => updateRiskRow('VSLD', index, 'moiNguy', e.target.value)}></textarea></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.moTa} onChange={(e) => updateRiskRow('VSLD', index, 'moTa', e.target.value)}></textarea></td>
-                                            <td><input className="w-full text-center border-none outline-none bg-transparent" value={item.bac} onChange={(e) => updateRiskRow('VSLD', index, 'bac', e.target.value)} /></td>
-                                            <td><textarea className="w-full h-full border-none outline-none resize-none bg-transparent" rows="3" value={item.bienPhap} onChange={(e) => updateRiskRow('VSLD', index, 'bienPhap', e.target.value)}></textarea></td>
-                                            <td className="text-center align-middle">
-                                                <button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><i data-lucide="trash-2" width="16"></i></button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    <tr>
-                                        <td colSpan="6" className="text-center p-1">
-                                            <button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full">
-                                                <i data-lucide="plus" width="14"></i> Thêm dòng VSLĐ
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            <div className="font-semibold">b) Ghi chú:</div>
-                            <textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea>
-                        </div>
-                    </div>
-
-                    {/* 9. TRÁCH NHIỆM */}
-                    <div className="mb-6">
-                        <div className="font-bold mb-2">9. Trách nhiệm của các đơn vị liên quan:</div>
-                        <div className="pl-4 space-y-4">
-                            
-                            <QuickInputSection title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):" value={formData.muc9a_catDien} onChange={(val) => setFormData({...formData, muc9a_catDien: val})} templates={tags9a} contextData={getContextData()} placeholder="- Cắt CB..." />
-                            <QuickInputSection title="b/ Đối với đơn vị công tác (Biện pháp an toàn):" value={formData.muc9b_anToan} onChange={(val) => setFormData({...formData, muc9b_anToan: val})} templates={tags9b} placeholder="- Chuẩn bị..." />
-                            <div><label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label><textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea></div>
-                            <div><label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label><textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea></div>
-                        </div>
-                    </div>
-
-                    {/* FOOTER */}
-                    <div className="mt-8 text-justify mb-8">
-                        Biên bản này được lập thành <input className="w-10 text-center border-b border-gray-300 font-bold" value={formData.soBan} onChange={e => setFormData({...formData, soBan: e.target.value})} /> bản 
-                        và được tất cả mọi người dự họp của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này.
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-8 text-center font-bold text-xs md:text-sm uppercase mb-20">
-                        <div>ĐẠI DIỆN ĐƠN VỊ<br/>LÀM CÔNG VIỆC<br/><div className="h-20"></div>{formData.dvct_daiDien1}</div>
-                        <div>ĐẠI DIỆN (CÁC) ĐƠN VỊ<br/>QUẢN LÝ VH<br/><div className="h-20"></div>{formData.qlvh_daiDien1}</div>
-                        <div>ĐẠI DIỆN (CÁC)<br/>ĐƠN VỊ ĐIỀU ĐỘ<br/><div className="h-20"></div></div>
-                        <div>ĐẠI DIỆN CÁC<br/>ĐƠN VỊ LIÊN QUAN<br/><div className="h-20"></div></div>
-                    </div>
-
-                    <div className="border-t-2 border-dashed pt-4 mt-8">
-                        <div className="font-bold text-center mb-4">SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC</div>
-                        <div className="h-64 bg-gray-50 border border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
-                            <i data-lucide="share-2" width="48" height="48" className="mb-2"></i>
-                            <span>(Khu vực hiển thị Sơ đồ một sợi từ module vẽ)</span>
-                            <button className="mt-2 bg-blue-100 text-blue-600 px-4 py-2 rounded text-sm font-semibold hover:bg-blue-200">Mở Trình Vẽ Sơ Đồ</button>
-                        </div>
-                    </div>
+                    <div className="mb-6"><div className="font-bold mb-2">9. Trách nhiệm của các đơn vị liên quan:</div><div className="pl-4 space-y-4"><QuickInputSection title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):" value={formData.muc9a_catDien} onChange={(val) => setFormData({...formData, muc9a_catDien: val})} templates={tags9a} contextData={getContextData()} placeholder="- Cắt CB..." /><QuickInputSection title="b/ Đối với đơn vị công tác (Biện pháp an toàn):" value={formData.muc9b_anToan} onChange={(val) => setFormData({...formData, muc9b_anToan: val})} templates={tags9b} placeholder="- Chuẩn bị..." /><div><label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label><textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea></div><div><label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label><textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea></div></div></div>
+                    <div className="mt-8 text-justify mb-8">Biên bản này được lập thành <input className="w-10 text-center border-b border-gray-300 font-bold" value={formData.soBan} onChange={e => setFormData({...formData, soBan: e.target.value})} /> bản và được tất cả mọi người dự họp của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này.</div>
+                    <div className="grid grid-cols-2 gap-8 text-center font-bold text-xs md:text-sm uppercase mb-20"><div>ĐẠI DIỆN ĐƠN VỊ<br/>LÀM CÔNG VIỆC<br/><div className="h-20"></div>{formData.dvct_daiDien1}</div><div>ĐẠI DIỆN (CÁC) ĐƠN VỊ<br/>QUẢN LÝ VH<br/><div className="h-20"></div>{formData.qlvh_daiDien1}</div><div>ĐẠI DIỆN (CÁC)<br/>ĐƠN VỊ ĐIỀU ĐỘ<br/><div className="h-20"></div></div><div>ĐẠI DIỆN CÁC<br/>ĐƠN VỊ LIÊN QUAN<br/><div className="h-20"></div></div></div>
+                    <div className="border-t-2 border-dashed pt-4 mt-8 break-inside-avoid"><div className="font-bold text-center mb-4">SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC</div><div className="relative w-full h-80 bg-gray-50 border border-gray-300 rounded-lg overflow-hidden group">{diagramData.length > 0 ?
+(<DiagramPreview objects={diagramData} />) : (<div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400"><UI_Icons.Share2 size={48} className="mb-2"/><span>(Chưa có sơ đồ)</span></div>)}<div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"><button onClick={() => setShowDiagram(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold hover:bg-blue-700 transform hover:scale-105 transition-all flex items-center gap-2"><UI_Icons.FileText size={18}/> {diagramData.length > 0 ? "Chỉnh Sửa Sơ Đồ" : "Mở Trình Vẽ Sơ Đồ"}</button></div>{diagramData.length === 0 && (<div className="absolute inset-0 flex items-center justify-center md:hidden pointer-events-none"><div className="mt-16 pointer-events-auto"><button onClick={() => setShowDiagram(true)} className="bg-blue-100 text-blue-600 px-4 py-2 rounded text-sm font-semibold hover:bg-blue-200">Mở Trình Vẽ Sơ Đồ</button></div></div>)}</div></div>
                 </div>
                 <div className="h-20"></div>
             </div>
