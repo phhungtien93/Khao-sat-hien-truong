@@ -577,13 +577,13 @@
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0 self-center">
-                                                        {/* Nút Xem Ảnh (MỚI) */}
+                                                        {/* --- NÚT XEM ẢNH (ĐÃ SỬA ICON) --- */}
                                                         {imgCount > 0 ? (
                                                             <button onClick={() => setPreviewImages(r.du_lieu_form.hinh_anh)} className="flex items-center gap-1 px-2 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm" title="Xem ảnh hiện trường">
-                                                                <UI_Icons.Share2 size={14}/> {imgCount}
+                                                                <UI_Icons.Image size={14}/> {imgCount}
                                                             </button>
                                                         ) : (
-                                                            <button className="p-1.5 text-gray-300 cursor-not-allowed" title="Không có ảnh"><UI_Icons.Share2 size={16}/></button>
+                                                            <button className="p-1.5 text-gray-300 cursor-not-allowed" title="Không có ảnh"><UI_Icons.Image size={16}/></button>
                                                         )}
 
                                                         <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[11px] font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
