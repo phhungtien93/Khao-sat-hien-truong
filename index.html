@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 4.2</title>
+    <title>Khảo Sát Hiện Trường Ver 4.6</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -741,6 +741,153 @@
         );
     };
 
+    // --- COMPONENT QUẢN LÝ MẪU (V2 - CÓ CHỨC NĂNG SỬA TRỰC TIẾP) ---
+    const TemplateManagerModal = ({ isOpen, onClose, onRefresh }) => {
+        const [activeTab, setActiveTab] = useState('noi_dung');
+        const [items, setItems] = useState([]);
+        const [newItem, setNewItem] = useState("");
+        const [loading, setLoading] = useState(false);
+
+        // State cho chức năng sửa (Edit)
+        const [editingId, setEditingId] = useState(null); // ID của dòng đang sửa
+        const [editValue, setEditValue] = useState("");   // Nội dung đang sửa
+
+        // Tải dữ liệu
+        const fetchItems = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('dm_mau_cong_viec')
+                .select('*')
+                .eq('loai', activeTab)
+                .order('id', { ascending: true });
+            
+            if (!error) setItems(data || []);
+            setLoading(false);
+        };
+
+        useEffect(() => {
+            if (isOpen) {
+                fetchItems();
+                setEditingId(null); // Reset trạng thái sửa khi mở lại
+            }
+        }, [isOpen, activeTab]);
+
+        // --- XỬ LÝ THÊM MỚI ---
+        const handleAdd = async () => {
+            if (!newItem.trim()) return;
+            const { error } = await supabase.from('dm_mau_cong_viec').insert([{ loai: activeTab, noi_dung: newItem.trim() }]);
+            if (error) alert("Lỗi thêm: " + error.message);
+            else { setNewItem(""); fetchItems(); onRefresh(); }
+        };
+
+        // --- XỬ LÝ XÓA ---
+        const handleDelete = async (id) => {
+            if (!confirm("Xóa dòng mẫu này?")) return;
+            const { error } = await supabase.from('dm_mau_cong_viec').delete().eq('id', id);
+            if (error) alert("Lỗi xóa: " + error.message);
+            else { fetchItems(); onRefresh(); }
+        };
+
+        // --- CÁC HÀM XỬ LÝ SỬA (EDIT) ---
+        const startEdit = (item) => {
+            setEditingId(item.id);
+            setEditValue(item.noi_dung);
+        };
+
+        const cancelEdit = () => {
+            setEditingId(null);
+            setEditValue("");
+        };
+
+        const saveEdit = async (id) => {
+            if (!editValue.trim()) return; // Không cho lưu rỗng
+            
+            const { error } = await supabase
+                .from('dm_mau_cong_viec')
+                .update({ noi_dung: editValue.trim() })
+                .eq('id', id);
+
+            if (error) {
+                alert("Lỗi cập nhật: " + error.message);
+            } else {
+                setEditingId(null); // Thoát chế độ sửa
+                fetchItems();       // Tải lại list trong modal
+                onRefresh();        // Tải lại list ngoài App
+            }
+        };
+
+        if (!isOpen) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black/50 z-[160] flex items-center justify-center p-4" onClick={onClose}>
+                <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                    <div className="p-3 border-b bg-purple-600 text-white rounded-t-lg flex justify-between items-center">
+                        <h3 className="font-bold flex items-center gap-2"><UI_Icons.Edit size={18}/> Quản Lý Mẫu Nhập Liệu</h3>
+                        <button onClick={onClose}><UI_Icons.X size={20}/></button>
+                    </div>
+                    
+                    <div className="p-3 flex gap-2 bg-gray-50 border-b">
+                        <button onClick={() => setActiveTab('noi_dung')} className={`flex-1 py-1.5 text-sm font-bold rounded ${activeTab === 'noi_dung' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-white border text-gray-500 hover:bg-gray-100'}`}>Mục 5. Nội dung</button>
+                        <button onClick={() => setActiveTab('pham_vi')} className={`flex-1 py-1.5 text-sm font-bold rounded ${activeTab === 'pham_vi' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-white border text-gray-500 hover:bg-gray-100'}`}>Mục 6. Phạm vi</button>
+                    </div>
+
+                    <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                        {loading ? <div className="text-center text-gray-400 text-sm">Đang tải...</div> : (
+                            items.length === 0 ? <div className="text-center text-gray-400 italic text-sm">Chưa có dữ liệu mẫu</div> : 
+                            items.map(item => (
+                                <div key={item.id} className={`flex justify-between items-center p-2 border rounded ${editingId === item.id ? 'bg-yellow-50 border-yellow-300' : 'bg-white hover:bg-gray-50'} group transition-colors`}>
+                                    
+                                    {/* --- CHẾ ĐỘ SỬA --- */}
+                                    {editingId === item.id ? (
+                                        <div className="flex w-full gap-2 items-center">
+                                            <input 
+                                                className="flex-1 border border-blue-300 rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                                value={editValue}
+                                                onChange={e => setEditValue(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if(e.key === 'Enter') saveEdit(item.id);
+                                                    if(e.key === 'Escape') cancelEdit();
+                                                }}
+                                                autoFocus
+                                            />
+                                            <button onClick={() => saveEdit(item.id)} className="text-green-600 hover:bg-green-100 p-1 rounded" title="Lưu lại"><UI_Icons.Save size={16}/></button>
+                                            <button onClick={cancelEdit} className="text-gray-500 hover:bg-gray-200 p-1 rounded" title="Hủy bỏ"><UI_Icons.X size={16}/></button>
+                                        </div>
+                                    ) : (
+                                    /* --- CHẾ ĐỘ XEM --- */
+                                        <>
+                                            <span className="text-sm font-medium text-gray-700 cursor-pointer flex-1" onClick={() => startEdit(item)}>{item.noi_dung}</span>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => startEdit(item)} className="text-blue-500 hover:bg-blue-100 p-1.5 rounded" title="Sửa dòng này"><UI_Icons.Edit size={14}/></button>
+                                                <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:bg-red-100 p-1.5 rounded" title="Xóa dòng này"><UI_Icons.Trash2 size={14}/></button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="p-3 border-t bg-gray-50 rounded-b-lg">
+                        <div className="flex gap-2">
+                            <input 
+                                className="flex-1 border rounded px-2 py-1.5 text-sm outline-none focus:border-purple-500" 
+                                placeholder="Nhập nội dung mẫu mới..." 
+                                value={newItem} 
+                                onChange={e => setNewItem(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                            />
+                            <button onClick={handleAdd} className="bg-purple-600 text-white px-3 py-1.5 rounded font-bold text-sm hover:bg-purple-700 shadow-sm flex items-center gap-1">
+                                <UI_Icons.Plus size={16}/> Thêm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+
 // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (ĐÃ CẬP NHẬT NÚT ĐĂNG XUẤT) ---
     const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom, onLogout, currentUser }) => {
         const [reports, setReports] = useState([]);
@@ -964,7 +1111,7 @@
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
             qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "", qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
             qlvh_daiDien3: "", qlvh_chucVu3: "", qlvh_donVi3: "",
-            dv_lienQuan: "", muc4_diaDiem: "", muc5_noiDung: "", muc6_phamVi: "",
+            dv_lienQuan: "", muc4_diaDiem: "Tại", muc5_noiDung: "", muc6_phamVi: "",
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", 
             muc7_ngay: getTodayISO(),       // Mặc định ngày hiện tại
             phieu_dgrr_ngay: getTodayISO(), // Mặc định ngày hiện tại
@@ -1018,29 +1165,32 @@
         const handlePoleChange = (e) => { const selectedCode = e.target.value; const found = dbPoles.find(p => p.code === selectedCode); setFormData(prev => ({ ...prev, loc_poleCode: selectedCode, loc_lineName: found ? found.line_name : "" })); };
         const tags9a = [ { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" }, { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" }, { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" }, { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" }, { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" } ];
         const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ." }, { label: "Thêm dây an toàn", content: "- Sử dụng dây an toàn 2 móc khi leo cao." }, { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." } ];
-        // Danh sách nội dung công việc mẫu
-        const taskTemplates = [
-            "Thay điện kế định kỳ",
-            "Thay điện kế cháy hỏng",
-            "Di dời điện kế về trụ",
-            "Kiểm tra, xử lý tiếp xúc lèo",
-            "Sửa chữa điện cáp hạ áp",
-            "Vệ sinh, bảo dưỡng trạm biến áp",
-            "Phát quang cây xanh trong hành lang tuyến"
-        ];
-        // State phụ để giữ giá trị đang chọn trong dropdown mẫu
-        const [selectedTaskTemplate, setSelectedTaskTemplate] = useState("");
 
-        // --- DANH SÁCH MẪU CHO MỤC 6 ---
-        const scopeTemplates = [
-            "Tại đầu trụ",
-            "Tại tủ điện kế",
-            "Tại đà trạm biến áp",
-            "Toàn bộ trạm biến áp",
-            "Dọc theo hành lang tuyến",
-            "Tại vị trí công tác"
-        ];
-        const [selectedScopeTemplate, setSelectedScopeTemplate] = useState("");
+        // --- QUẢN LÝ LIST MẪU TỪ DB ---
+        const [taskTemplates, setTaskTemplates] = useState([]);
+        const [scopeTemplates, setScopeTemplates] = useState([]);
+        const [showTemplateManager, setShowTemplateManager] = useState(false); // State mở modal
+        const [selectedTaskTemplate, setSelectedTaskTemplate] = useState(""); // Biến giữ giá trị chọn Mục 5
+        const [selectedScopeTemplate, setSelectedScopeTemplate] = useState(""); // Biến giữ giá trị chọn Mục 6
+
+        // Hàm tải dữ liệu mẫu từ Supabase
+        const fetchWorkTemplates = async () => {
+            const { data } = await supabase.from('dm_mau_cong_viec').select('*');
+            if (data) {
+                setTaskTemplates(data.filter(i => i.loai === 'noi_dung').map(i => i.noi_dung));
+                setScopeTemplates(data.filter(i => i.loai === 'pham_vi').map(i => i.noi_dung));
+            }
+        };
+
+        // Gọi hàm này trong useEffect đầu tiên (cùng chỗ tải poles, communes...)
+        useEffect(() => {
+            const fetchData = async () => {
+                // ... (các lệnh gọi api cũ giữ nguyên: poles, communes, risks...)
+                
+                await fetchWorkTemplates(); // <--- THÊM DÒNG NÀY
+            };
+            fetchData();
+        }, []);
 
         const getContextData = () => { return { code: formData.loc_poleCode, sub: formData.loc_subCode, line: formData.loc_lineName }; };
         
@@ -1117,7 +1267,7 @@
             const lineLong = await createLineBuffer(210);
 
             // 3. TẠO FILE WORD
-            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, TextWrappingSide } = window.docx;
+            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, TextWrappingSide, VerticalAlign, TableLayoutType } = window.docx;
             let diagramImage = null, imgWidth = 600, imgHeight = 400;
             
             if (sourceDiagram && sourceDiagram.length > 0) {
@@ -1224,7 +1374,7 @@
                         
 
 
-createPara("Chúng tôi gồm:", true, 24),
+                        createPara("Chúng tôi gồm:", true, 24),
                         
                         // --- MỤC 1: ĐƠN VỊ CÔNG TÁC ---
                         createPara("1. Đại diện Đơn vị công tác:", true, 24),
@@ -1271,7 +1421,7 @@ createPara("Chúng tôi gồm:", true, 24),
                         new Paragraph({
                             children: [
                                 new TextRun({ text: "3. Đại diện các đơn vị có liên quan: ", bold: true, size: 24, font: "Times New Roman" }),
-                                new TextRun({ text: txtDots(sourceForm.dv_lienQuan, 50), bold: false, size: 24, font: "Times New Roman" })
+                                new TextRun({ text: txtDots(sourceForm.dv_lienQuan, 88), bold: false, size: 24, font: "Times New Roman" })
                             ],
                             spacing: { after: 50, before: 50 }
                         }),
@@ -1329,46 +1479,109 @@ createPara("Chúng tôi gồm:", true, 24),
                             spacing: { after: 50, before: 50 }
                         }),
 
-                        createPara("8. Kết quả Đánh giá rủi ro của đơn vị công tác:", true, 24),
-                        // DÒNG PHIẾU ĐGRR MỚI THÊM
-                        createPara(`a) Kết quả ĐGRR tại hiện trường (Theo Phiếu ĐGRR ngày ${datePhieu})`, false, 24),
+                    createPara("8. Kết quả Đánh giá rủi ro của đơn vị công tác:", true, 24),
+                    createPara(`a) Kết quả ĐGRR tại hiện trường (Theo Phiếu ĐGRR ngày ${datePhieu})`, false, 24),
+                    
+                     // --- BẢNG MỤC 8 (FIXED LAYOUT - CỐ ĐỊNH CỘT) ---
+                    new Table({ 
+                        layout: TableLayoutType.FIXED, // <--- QUAN TRỌNG: Khóa cố định chiều rộng
+                        width: { size: 100, type: WidthType.PERCENTAGE }, 
+                        margins: {
+                            top: 50,    // Cách lề trên một chút
+                            bottom: 50, // Cách lề dưới một chút
+                            left: 100,  // Cách lề trái (quan trọng)
+                            right: 100  // Cách lề phải (quan trọng)
+                        },
+                        rows: [ 
+                            // --- HEADER HÀNG 1 ---
+                            new TableRow({ children: [
+                                new TableCell({ 
+                                    children: [createPara("STT", true, 24, AlignmentType.CENTER)], 
+                                    verticalMerge: "restart", 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 5, type: WidthType.PERCENTAGE } // STT: 5%
+                                }),
+                                new TableCell({ 
+                                    children: [createPara("Nhận diện mối nguy", true, 24, AlignmentType.CENTER)], 
+                                    verticalMerge: "restart", 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 20, type: WidthType.PERCENTAGE } // Tên mối nguy: 20%
+                                }),
+                                new TableCell({ 
+                                    children: [createPara("Mô tả mối nguy", true, 24, AlignmentType.CENTER)], 
+                                    verticalMerge: "restart", 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 25, type: WidthType.PERCENTAGE } // Mô tả: 25%
+                                }),
+                                new TableCell({ 
+                                    children: [createPara("Kết quả ĐGRR", true, 24, AlignmentType.CENTER)], 
+                                    columnSpan: 2, 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 50, type: WidthType.PERCENTAGE } // Tổng 2 cột con (10+40)
+                                }),
+                            ]}),
+                            
+                            // --- HEADER HÀNG 2 ---
+                            new TableRow({ children: [
+                                new TableCell({ children: [], verticalMerge: "continue" }),
+                                new TableCell({ children: [], verticalMerge: "continue" }),
+                                new TableCell({ children: [], verticalMerge: "continue" }),
+                                new TableCell({ 
+                                    children: [createPara("Bậc rủi ro sau kiểm soát", true, 24, AlignmentType.CENTER)], 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 10, type: WidthType.PERCENTAGE } // Bậc: 10%
+                                }),
+                                new TableCell({ 
+                                    children: [createPara("Biện pháp kiểm soát rủi ro khi thực hiện", true, 24, AlignmentType.CENTER)], 
+                                    verticalAlign: VerticalAlign.CENTER,
+                                    width: { size: 40, type: WidthType.PERCENTAGE } // Biện pháp: 40%
+                                }),
+                            ]}),
 
-                        new Table({ 
-                            width: { size: 100, type: WidthType.PERCENTAGE }, 
-                            rows: [ 
-                                new TableRow({ children: ["Stt", "Nhận diện mối nguy", "Mô tả mối nguy", "Bậc RR", "Biện pháp kiểm soát"].map(text => new TableCell({ children: [createPara(text, true, 24, AlignmentType.CENTER)], shading: { fill: "f3f4f6" } })) }), 
-                                
-                                // Dòng ATLĐ: Căn giữa, Bỏ tô màu
-                                new TableRow({ children: [new TableCell({ children: [createPara("ATLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
-                                
-                                ...sourceForm.ruiRo_ATLD.map((item, idx) => new TableRow({ children: [
-                                    new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
-                                    new TableCell({ children: [createPara(item.moiNguy)] }), 
-                                    new TableCell({ children: [createPara(item.moTa)] }), 
-                                    new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
-                                    new TableCell({ children: [createPara(item.bienPhap)] })
-                                ] })), 
-                                
-                                // Dòng VSLĐ: Căn giữa, Bỏ tô màu
-                                new TableRow({ children: [new TableCell({ children: [createPara("VSLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
-                                
-                                ...sourceForm.ruiRo_VSLD.map((item, idx) => new TableRow({ children: [
-                                    new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
-                                    new TableCell({ children: [createPara(item.moiNguy)] }), 
-                                    new TableCell({ children: [createPara(item.moTa)] }), 
-                                    new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
-                                    new TableCell({ children: [createPara(item.bienPhap)] })
-                                ] })), 
-                            ] 
-                        }),
+                            // --- DỮ LIỆU ATLĐ ---
+                            new TableRow({ children: [new TableCell({ children: [createPara("ATLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
+                            ...sourceForm.ruiRo_ATLD.map((item, idx) => new TableRow({ children: [ 
+                                new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
+                                new TableCell({ children: [createPara(item.moiNguy)] }), 
+                                new TableCell({ children: [createPara(item.moTa)] }), 
+                                new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
+                                new TableCell({ children: [createPara(item.bienPhap)] }) 
+                            ] })), 
+                            
+                            // --- DỮ LIỆU VSLĐ ---
+                            new TableRow({ children: [new TableCell({ children: [createPara("VSLĐ", true, 24, AlignmentType.CENTER)], columnSpan: 5 })] }), 
+                            ...sourceForm.ruiRo_VSLD.map((item, idx) => new TableRow({ children: [ 
+                                new TableCell({ children: [createPara((idx + 1).toString(), false, 24, AlignmentType.CENTER)] }), 
+                                new TableCell({ children: [createPara(item.moiNguy)] }), 
+                                new TableCell({ children: [createPara(item.moTa)] }), 
+                                new TableCell({ children: [createPara(item.bac, false, 24, AlignmentType.CENTER)] }), 
+                                new TableCell({ children: [createPara(item.bienPhap)] }) 
+                            ] })), 
+                        ] 
+                    }),
                         
-                        createPara("b) Ghi chú:", true, 24), ...formatMultilineText(sourceForm.ruiRo_ghiChu), createPara("", false, 24),
+                        createPara("b) Ghi chú:", true, 24), ...formatMultilineText(sourceForm.ruiRo_ghiChu),
                         
                         createPara("9. Trách nhiệm của các đơn vị liên quan:", true, 24),
                         createPara("a/ Đối với (các) đơn vị quản lý vận hành:", true, 24), ...formatMultilineText(sourceForm.muc9a_catDien),
                         createPara("b/ Đối với đơn vị công tác:", true, 24), ...formatMultilineText(sourceForm.muc9b_anToan),
-                        createPara("c/ Đối với (các) đơn vị điều độ (nếu có):", true, 24), ...formatMultilineText(sourceForm.muc9c_dieuDo),
-                        createPara("d/ Những nội dung khác liên quan đến công việc:", true, 24), ...formatMultilineText(sourceForm.muc9d_khac),
+                        // --- MỤC 9c (ĐÃ SỬA: CÓ DẤU CHẤM DÀI) ---
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "c/ Đối với (các) đơn vị điều độ (nếu có): ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: txtDots(sourceForm.muc9c_dieuDo, 80), bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
+
+                        // --- MỤC 9d (ĐÃ SỬA: CÓ DẤU CHẤM DÀI) ---
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: "d/ Những nội dung khác có liên quan đến công việc: ", bold: true, size: 24, font: "Times New Roman" }),
+                                new TextRun({ text: txtDots(sourceForm.muc9d_khac, 60), bold: false, size: 24, font: "Times New Roman" })
+                            ],
+                            spacing: { after: 50, before: 50 }
+                        }),
 
                         
                         createPara(`Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp là đại diện của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này (nếu không thay đổi về những nội dung chính) và ký tên dưới đây.`, false, 24, AlignmentType.JUSTIFIED),
@@ -1607,6 +1820,13 @@ createPara("Chúng tôi gồm:", true, 24),
                 />
                 <RiskManagerModal isOpen={showRiskManager} onClose={() => setShowRiskManager(false)} onRefresh={fetchRiskLibrary} existingRisks={riskLibrary.risks} />
 
+                {/* Modal Quản lý Mẫu công việc */}
+                <TemplateManagerModal 
+                    isOpen={showTemplateManager} 
+                    onClose={() => setShowTemplateManager(false)} 
+                    onRefresh={fetchWorkTemplates} 
+                />
+
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                     <div className="text-xs text-gray-500 font-medium">{currentReportId ? <span className="text-blue-600 font-bold">Đang sửa: {formData.loc_poleCode}</span> : "Đang tạo mới"}</div>
                     <div className="flex gap-2">
@@ -1627,6 +1847,16 @@ createPara("Chúng tôi gồm:", true, 24),
                         >
                             Hủy/Thoát
                         </button>
+
+                        {/* --- NÚT QUẢN LÝ MẪU MỚI --- */}
+                        <button 
+                            onClick={() => setShowTemplateManager(true)} 
+                            className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-200 border border-purple-300" 
+                            title="Chỉnh sửa list Nội dung & Phạm vi"
+                        >
+                            <UI_Icons.Edit size={18}/> <span className="hidden md:inline">List Mẫu</span>
+                        </button>
+
                         <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
                         <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
                         <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
@@ -1670,22 +1900,31 @@ createPara("Chúng tôi gồm:", true, 24),
 
                     <div className="mb-4 text-justify text-black font-normal">Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:</div>
 
-                    <div className="space-y-3 mb-6">{/* --- MỤC 4: ĐỊA ĐIỂM (ĐÃ SỬA: GIỮ NGUYÊN CẤU TRÚC GỐC, THÊM NÚT DÁN) --- */}
+                    <div className="space-y-3 mb-6">
+                    {/* --- MỤC 4: ĐỊA ĐIỂM (ĐÃ SỬA: NỐI TIẾP NỘI DUNG, KHÔNG XÓA CŨ) --- */}
                         <div>
                             <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span>
                                 
                                 <button 
                                     onClick={() => {
+                                        // 1. Lấy thông tin từ phần đầu
                                         const tru = formData.loc_poleCode || "...";
                                         const sub = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
                                         const tuyen = formData.loc_lineName || "...";
                                         const xa = formData.loc_commune || "...";
-                                        const textDiaDiem = `Trụ ${tru}${sub} tuyến ${tuyen}, , xã ${xa}, tỉnh An Giang`;
-                                        setFormData({ ...formData, muc4_diaDiem: textDiaDiem });
+                                        const textDiaDiem = `trụ ${tru}${sub} tuyến ${tuyen}, xã ${xa}, tỉnh An Giang`;
+                                        
+                                        // 2. Lấy nội dung hiện tại đang có trong ô
+                                        const currentText = formData.muc4_diaDiem || "";
+
+                                        // 3. Nối chuỗi: Nếu đã có chữ thì thêm dấu cách + nội dung mới
+                                        const newText = currentText ? (currentText + " " + textDiaDiem) : textDiaDiem;
+
+                                        setFormData({ ...formData, muc4_diaDiem: newText });
                                     }}
                                     className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
-                                    title="Tự động lấy: Trụ... tuyến... xã..."
+                                    title="Thêm địa điểm vào sau nội dung hiện tại"
                                 >
                                     <UI_Icons.Plus size={12}/> Dán Đ.Điểm
                                 </button>
@@ -1801,7 +2040,23 @@ createPara("Chúng tôi gồm:", true, 24),
                         {/* Mục 8a với Input Date */}
                         <div className="font-semibold mb-2 flex flex-wrap items-center gap-1">a) Kết quả ĐGRR tại hiện trường (Theo Phiếu ĐGRR ngày <input type="date" className="border-b border-gray-400 outline-none px-1 font-bold bg-transparent text-blue-800" value={formData.phieu_dgrr_ngay} onChange={e => setFormData({...formData, phieu_dgrr_ngay: e.target.value})} />)</div>
                         
-                        <table className="w-full"><thead><tr><th className="w-10">Stt</th><th className="w-1/4">Nhận diện mối nguy</th><th className="w-1/4">Mô tả mối nguy</th><th className="w-16">Bậc RR</th><th>Biện pháp kiểm soát</th><th className="w-8"></th></tr></thead><tbody><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">ATLĐ (An toàn lao động)</td></tr>{formData.ruiRo_ATLD.map((item, index) => (<tr key={`atld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-blue-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_ATLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai !== 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng ATLĐ</button></td></tr><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">VSLĐ (Vệ sinh lao động)</td></tr>{formData.ruiRo_VSLD.map((item, index) => (<tr key={`vsld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-green-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_VSLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai === 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng VSLĐ</button></td></tr></tbody></table><div className="font-semibold">b) Ghi chú:</div><textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea></div></div>
+                        <table className="w-full">
+                        {/* --- BẮT ĐẦU HEADER BẢNG 8.A (ĐÃ SỬA GIỐNG HÌNH) --- */}
+                        <thead>
+                            <tr>
+                                <th rowSpan="2" className="w-10 border border-gray-300 bg-gray-100 p-2 text-center align-middle">STT</th>
+                                <th rowSpan="2" className="w-1/4 border border-gray-300 bg-gray-100 p-2 text-center align-middle">Nhận diện mối nguy</th>
+                                <th rowSpan="2" className="w-1/4 border border-gray-300 bg-gray-100 p-2 text-center align-middle">Mô tả mối nguy</th>
+                                <th colSpan="2" className="border border-gray-300 bg-gray-100 p-2 text-center">Kết quả ĐGRR</th>
+                                <th rowSpan="2" className="w-8 border border-gray-300 bg-gray-100 p-2"></th>
+                            </tr>
+                            <tr>
+                                <th className="w-24 border border-gray-300 bg-gray-100 p-2 text-center">Bậc rủi ro sau kiểm soát</th>
+                                <th className="border border-gray-300 bg-gray-100 p-2 text-center">Biện pháp kiểm soát rủi ro khi thực hiện</th>
+                            </tr>
+                        </thead>
+                        {/* --- KẾT THÚC HEADER --- */}
+                        <tbody><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">ATLĐ (An toàn lao động)</td></tr>{formData.ruiRo_ATLD.map((item, index) => (<tr key={`atld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-blue-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_ATLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai !== 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng ATLĐ</button></td></tr><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">VSLĐ (Vệ sinh lao động)</td></tr>{formData.ruiRo_VSLD.map((item, index) => (<tr key={`vsld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-green-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_VSLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai === 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng VSLĐ</button></td></tr></tbody></table><div className="font-semibold">b) Ghi chú:</div><textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea></div></div>
 
                     <div className="mb-6"><div className="font-bold mb-2">9. Trách nhiệm của các đơn vị liên quan:</div><div className="pl-4 space-y-4"><QuickInputSection title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):" value={formData.muc9a_catDien} onChange={(val) => setFormData({...formData, muc9a_catDien: val})} templates={tags9a} contextData={getContextData()} placeholder="- Cắt CB..." /><QuickInputSection title="b/ Đối với đơn vị công tác (Biện pháp an toàn):" value={formData.muc9b_anToan} onChange={(val) => setFormData({...formData, muc9b_anToan: val})} templates={tags9b} placeholder="- Chuẩn bị..." /><div><label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label><textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea></div><div><label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label><textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea></div></div></div>
                     <div className="mt-8 text-justify mb-8">Biên bản này được lập thành <input className="w-10 text-center border-b border-gray-300 font-bold" value={formData.soBan} onChange={e => setFormData({...formData, soBan: e.target.value})} /> bản và được tất cả mọi người dự họp là đại diện của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này (nếu không thay đổi về những nội dung chính) và ký tên dưới đây.</div>
