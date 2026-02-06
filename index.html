@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 3.6</title>
+    <title>Khảo Sát Hiện Trường Ver 4.2</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -692,14 +692,14 @@
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
             qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "", qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
             qlvh_daiDien3: "", qlvh_chucVu3: "", qlvh_donVi3: "",
-            dv_lienQuan: "", muc4_diaDiem: "", muc5_noiDung: "Thay điện kế định kỳ", muc6_phamVi: "",
+            dv_lienQuan: "", muc4_diaDiem: "", muc5_noiDung: "", muc6_phamVi: "",
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", 
             muc7_ngay: getTodayISO(),       // Mặc định ngày hiện tại
             phieu_dgrr_ngay: getTodayISO(), // Mặc định ngày hiện tại
             ruiRo_ATLD: [{ riskId: 1, moiNguy: "Phóng điện", moTa: "Điện hạ áp giật", bac: "II", bienPhap: "Thực hiện biện pháp an toàn..." }],
             ruiRo_VSLD: [{ riskId: null, moiNguy: "", moTa: "", bac: "", bienPhap: "" }],
-            ruiRo_ghiChu: "- Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt\n- Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp\n- Đặt rào chắn xung quanh vị trí công tác\n- Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao\n- Tránh làm việc khi thời tiết quá nóng",
-            muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị...", muc9c_dieuDo: "", muc9d_khac: "", soBan: "02",
+            ruiRo_ghiChu: "- Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt.\n- Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp.\n- Đặt rào chắn xung quanh vị trí công tác.\n- Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao.\n- Tránh làm việc khi thời tiết quá nóng.",
+            muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị...", muc9c_dieuDo: "", muc9d_khac: "", soBan: "01",
             hinh_anh: [] // Mảng chứa URL ảnh
         };
 
@@ -746,6 +746,30 @@
         const handlePoleChange = (e) => { const selectedCode = e.target.value; const found = dbPoles.find(p => p.code === selectedCode); setFormData(prev => ({ ...prev, loc_poleCode: selectedCode, loc_lineName: found ? found.line_name : "" })); };
         const tags9a = [ { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" }, { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" }, { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" }, { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" }, { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" } ];
         const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ." }, { label: "Thêm dây an toàn", content: "- Sử dụng dây an toàn 2 móc khi leo cao." }, { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." } ];
+        // Danh sách nội dung công việc mẫu
+        const taskTemplates = [
+            "Thay điện kế định kỳ",
+            "Thay điện kế cháy hỏng",
+            "Di dời điện kế về trụ",
+            "Kiểm tra, xử lý tiếp xúc lèo",
+            "Sửa chữa điện cáp hạ áp",
+            "Vệ sinh, bảo dưỡng trạm biến áp",
+            "Phát quang cây xanh trong hành lang tuyến"
+        ];
+        // State phụ để giữ giá trị đang chọn trong dropdown mẫu
+        const [selectedTaskTemplate, setSelectedTaskTemplate] = useState("");
+
+        // --- DANH SÁCH MẪU CHO MỤC 6 ---
+        const scopeTemplates = [
+            "Tại đầu trụ",
+            "Tại tủ điện kế",
+            "Tại đà trạm biến áp",
+            "Toàn bộ trạm biến áp",
+            "Dọc theo hành lang tuyến",
+            "Tại vị trí công tác"
+        ];
+        const [selectedScopeTemplate, setSelectedScopeTemplate] = useState("");
+
         const getContextData = () => { return { code: formData.loc_poleCode, sub: formData.loc_subCode, line: formData.loc_lineName }; };
         
         const generateDiagramImage = async (data) => {
@@ -980,7 +1004,19 @@ createPara("Chúng tôi gồm:", true, 24),
                             spacing: { after: 50, before: 50 }
                         }),
                         
-                        new Paragraph({ children: [new TextRun({ text: "Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:", size: 24, font: "Times New Roman" })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }),
+                        new Paragraph({ 
+                            children: [
+                                new TextRun({ 
+                                    text: "Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:", 
+                                    size: 24, 
+                                    font: "Times New Roman",
+                                    italics: false // Tắt nghiêng cho chữ
+                                })
+                            ], 
+                            alignment: AlignmentType.JUSTIFIED, 
+                            spacing: { after: 100 },
+                            style: "Normal" // Ép về kiểu mặc định để không bị dính định dạng cũ
+                        }),
                         
                         // Mục 4
                         new Paragraph({
@@ -1061,9 +1097,9 @@ createPara("Chúng tôi gồm:", true, 24),
                         createPara("b/ Đối với đơn vị công tác:", true, 24), ...formatMultilineText(sourceForm.muc9b_anToan),
                         createPara("c/ Đối với (các) đơn vị điều độ (nếu có):", true, 24), ...formatMultilineText(sourceForm.muc9c_dieuDo),
                         createPara("d/ Những nội dung khác liên quan đến công việc:", true, 24), ...formatMultilineText(sourceForm.muc9d_khac),
-                        createPara("", false, 24),
+
                         
-                        createPara(`Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp thống nhất thông qua.`, false, 24, AlignmentType.JUSTIFIED),
+                        createPara(`Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp là đại diện của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này (nếu không thay đổi về những nội dung chính) và ký tên dưới đây.`, false, 24, AlignmentType.JUSTIFIED),
                         createPara("", false, 24),
                         
 // --- PHẦN CHỮ KÝ (ĐÃ SỬA: 3 CỘT TRÊN + 1 CỘT DƯỚI) ---
@@ -1212,10 +1248,35 @@ createPara("Chúng tôi gồm:", true, 24),
             }));
         };
 
-        const removeImage = (index) => {
+// --- HÀM XÓA ẢNH (ĐÃ SỬA: XÓA CẢ TRÊN CLOUD) ---
+        const removeImage = async (index) => {
+            const urlToDelete = formData.hinh_anh[index];
+            
+            // 1. Xác nhận trước khi xóa (tránh bấm nhầm)
+            if(!confirm("Bạn chắc chắn muốn xóa ảnh này?")) return;
+
+            // 2. Xóa khỏi giao diện ngay lập tức
             const newImages = [...(formData.hinh_anh || [])];
             newImages.splice(index, 1);
             setFormData({ ...formData, hinh_anh: newImages });
+
+            // 3. Xóa file trên Supabase Storage (Chạy ngầm)
+            if (urlToDelete) {
+                try {
+                    // URL thường có dạng: .../public/survey_images/filename.jpg
+                    // Ta cần lấy phần: filename.jpg
+                    const bucketName = 'survey_images';
+                    const parts = urlToDelete.split(`${bucketName}/`);
+                    
+                    if (parts.length > 1) {
+                        const filePath = parts.pop(); // Lấy phần cuối cùng
+                        await supabase.storage.from(bucketName).remove([filePath]);
+                        console.log("Đã xóa file trên cloud:", filePath);
+                    }
+                } catch (err) {
+                    console.error("Lỗi xóa file cloud:", err);
+                }
+            }
         };
 
         const handleRiskTypeChange = (listKey, index, e) => {
@@ -1277,7 +1338,23 @@ createPara("Chúng tôi gồm:", true, 24),
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                     <div className="text-xs text-gray-500 font-medium">{currentReportId ? <span className="text-blue-600 font-bold">Đang sửa: {formData.loc_poleCode}</span> : "Đang tạo mới"}</div>
                     <div className="flex gap-2">
-                        <button onClick={() => { if(confirm("Dữ liệu chưa lưu sẽ mất. Bạn chắc chắn muốn thoát?")) setShowReportList(true); }} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm">Hủy/Thoát</button>
+                        <button 
+                            onClick={async () => { 
+                                if(confirm("Dữ liệu chưa lưu sẽ mất. Bạn chắc chắn muốn thoát?")) {
+                                    // NẾU ĐANG TẠO MỚI (Chưa có ID) -> Xóa sạch ảnh vừa up để tránh rác
+                                    if (!currentReportId && formData.hinh_anh.length > 0) {
+                                        const bucketName = 'survey_images';
+                                        const pathsToDelete = formData.hinh_anh.map(url => url.split(`${bucketName}/`).pop());
+                                        await supabase.storage.from(bucketName).remove(pathsToDelete);
+                                        console.log("Đã dọn dẹp ảnh rác do hủy tạo mới");
+                                    }
+                                    setShowReportList(true); 
+                                }
+                            }} 
+                            className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm"
+                        >
+                            Hủy/Thoát
+                        </button>
                         <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
                         <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
                         <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
@@ -1316,9 +1393,133 @@ createPara("Chúng tôi gồm:", true, 24),
 
                         </div>
                     </div>
+
                     <div className="mb-4 pl-4"><div className="font-bold">3. Đại diện các đơn vị có liên quan:</div><textarea className="input-line pl-4 resize-none" rows="2" value={formData.dv_lienQuan} onChange={e => setFormData({...formData, dv_lienQuan: e.target.value})} placeholder="..."></textarea></div>
-                    <div className="mb-4 italic text-justify text-black">Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:</div>
-                    <div className="space-y-3 mb-6"><div><span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span><textarea className="input-line" rows="2" value={formData.muc4_diaDiem} onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}></textarea></div><div><span className="font-bold">5. Nội dung công việc:</span><input className="input-line" value={formData.muc5_noiDung} onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} /></div><div><span className="font-bold">6. Phạm vi làm việc:</span><input className="input-line" value={formData.muc6_phamVi} onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} /></div>
+
+                    <div className="mb-4 text-justify text-black font-normal">Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:</div>
+
+                    <div className="space-y-3 mb-6">{/* --- MỤC 4: ĐỊA ĐIỂM (ĐÃ SỬA: GIỮ NGUYÊN CẤU TRÚC GỐC, THÊM NÚT DÁN) --- */}
+                        <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span>
+                                
+                                <button 
+                                    onClick={() => {
+                                        const tru = formData.loc_poleCode || "...";
+                                        const sub = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
+                                        const tuyen = formData.loc_lineName || "...";
+                                        const xa = formData.loc_commune || "...";
+                                        const textDiaDiem = `Trụ ${tru}${sub} tuyến ${tuyen}, , xã ${xa}, tỉnh An Giang`;
+                                        setFormData({ ...formData, muc4_diaDiem: textDiaDiem });
+                                    }}
+                                    className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
+                                    title="Tự động lấy: Trụ... tuyến... xã..."
+                                >
+                                    <UI_Icons.Plus size={12}/> Dán Đ.Điểm
+                                </button>
+                            </div>
+                            <textarea 
+                                className="input-line w-full resize-none font-medium text-blue-900" 
+                                rows="2" 
+                                value={formData.muc4_diaDiem} 
+                                onChange={e => setFormData({...formData, muc4_diaDiem: e.target.value})}
+                            ></textarea>
+                        </div>
+
+                    {/* --- MỤC 5: NỘI DUNG CÔNG VIỆC (CÓ DANH SÁCH MẪU) --- */}
+                    <div className="mb-4">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="font-bold">5. Nội dung công việc:</span>
+                            
+                            {/* Danh sách chọn mẫu */}
+                            <select 
+                                className="border rounded px-2 py-1 text-sm bg-gray-50 outline-none focus:border-blue-500"
+                                value={selectedTaskTemplate}
+                                onChange={(e) => setSelectedTaskTemplate(e.target.value)}
+                            >
+                                <option value="">-- Chọn mẫu --</option>
+                                {taskTemplates.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                            </select>
+
+                            {/* Nút Dán (+) */}
+                            <button 
+                                onClick={() => {
+                                    if(!selectedTaskTemplate) return;
+                                    // Dán nội dung mẫu vào ô nhập chính (có thể cộng dồn hoặc thay thế tùy bạn, ở đây tôi dùng cộng dồn)
+                                    const newValue = formData.muc5_noiDung ? formData.muc5_noiDung + ", " + selectedTaskTemplate : selectedTaskTemplate;
+                                    setFormData({...formData, muc5_noiDung: newValue});
+                                }}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1"
+                            >
+                                <UI_Icons.Plus size={14}/> Dán
+                            </button>
+                        </div>
+                        
+                        {/* Ô nhập liệu chính */}
+                        <input 
+                            className="input-line w-full font-medium text-blue-800" 
+                            value={formData.muc5_noiDung} 
+                            onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} 
+                            placeholder="Nội dung công việc cụ thể..."
+                        />
+                    </div>      
+
+                    {/* --- MỤC 6: PHẠM VI (CÓ LIST CHỌN + NÚT DÁN TỰ ĐỘNG) --- */}
+                        <div>
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <span className="font-bold">6. Phạm vi làm việc:</span>
+                                
+                                {/* 1. List chọn mẫu */}
+                                <select 
+                                    className="border rounded px-2 py-1 text-sm bg-gray-50 outline-none focus:border-blue-500 max-w-[120px]"
+                                    value={selectedScopeTemplate}
+                                    onChange={(e) => setSelectedScopeTemplate(e.target.value)}
+                                >
+                                    <option value="">-- Mẫu --</option>
+                                    {scopeTemplates.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                                </select>
+
+                                {/* 2. Nút Dán từ List (+ Dán) */}
+                                <button 
+                                    onClick={() => {
+                                        if(!selectedScopeTemplate) return;
+                                        const cur = formData.muc6_phamVi;
+                                        // Cộng dồn vào nội dung cũ
+                                        setFormData({...formData, muc6_phamVi: cur ? cur + ", " + selectedScopeTemplate : selectedScopeTemplate});
+                                    }}
+                                    className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
+                                    title="Dán nội dung từ danh sách chọn"
+                                >
+                                    <UI_Icons.Plus size={12}/> Dán
+                                </button>
+
+                                {/* 3. Nút Dán Trụ/Tuyến tự động (+ Trụ/Tuyến) */}
+                                <button 
+                                    onClick={() => {
+                                        const tru = formData.loc_poleCode || "...";
+                                        const sub = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
+                                        const tuyen = formData.loc_lineName || "...";
+                                        // Tạo chuỗi: trụ ... tuyến ...
+                                        const textAuto = `trụ ${tru}${sub} tuyến ${tuyen}`;
+                                        
+                                        const cur = formData.muc6_phamVi;
+                                        // Cộng dồn vào nội dung cũ (thêm khoảng trắng)
+                                        setFormData({...formData, muc6_phamVi: cur ? cur + " " + textAuto : textAuto});
+                                    }}
+                                    className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
+                                    title="Tự động lấy: trụ... tuyến..."
+                                >
+                                    <UI_Icons.Plus size={12}/> Trụ/Tuyến
+                                </button>
+                            </div>
+                            
+                            {/* Ô nhập liệu chính */}
+                            <input 
+                                className="input-line w-full font-medium text-blue-800" 
+                                value={formData.muc6_phamVi} 
+                                onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} 
+                            />
+                        </div>
                     
                     {/* Mục 7 với Input Date */}
                     <div><span className="font-bold">7. Thời gian tiến hành công việc:</span><div className="flex flex-wrap items-center gap-2 mt-1">Từ <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianTu} onChange={(val) => setFormData({...formData, muc7_thoiGianTu: val})} /></div>đến <div className="mx-1"><TimeSelect value={formData.muc7_thoiGianDen} onChange={(val) => setFormData({...formData, muc7_thoiGianDen: val})} /></div>, ngày <input type="date" className="border-b border-gray-300 font-bold bg-transparent outline-none px-1 text-blue-800" value={formData.muc7_ngay} onChange={e => setFormData({...formData, muc7_ngay: e.target.value})} /></div></div></div>
@@ -1331,7 +1532,7 @@ createPara("Chúng tôi gồm:", true, 24),
                         <table className="w-full"><thead><tr><th className="w-10">Stt</th><th className="w-1/4">Nhận diện mối nguy</th><th className="w-1/4">Mô tả mối nguy</th><th className="w-16">Bậc RR</th><th>Biện pháp kiểm soát</th><th className="w-8"></th></tr></thead><tbody><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-blue-700 uppercase tracking-wide">ATLĐ (An toàn lao động)</td></tr>{formData.ruiRo_ATLD.map((item, index) => (<tr key={`atld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-blue-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_ATLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai !== 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_ATLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-blue-50 relative group" onClick={() => openRiskModal('ruiRo_ATLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-blue-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('ATLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('ATLD')} className="text-sm text-blue-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng ATLĐ</button></td></tr><tr><td colSpan="6" className="bg-gray-100 font-bold text-center text-green-700 uppercase tracking-wide">VSLĐ (Vệ sinh lao động)</td></tr>{formData.ruiRo_VSLD.map((item, index) => (<tr key={`vsld-${index}`}><td className="text-center">{index + 1}</td><td><select className="w-full border-none outline-none bg-transparent cursor-pointer font-medium text-green-900" value={item.riskId || ""} onChange={(e) => handleRiskTypeChange('ruiRo_VSLD', index, e)}><option value="">-- Chọn Mối nguy --</option>{riskLibrary.risks.filter(r => r.loai === 'VSLD').map(r => <option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>)}</select>{!item.riskId && <input className="w-full text-xs border-t mt-1 placeholder-gray-400" placeholder="Hoặc nhập tay..." value={item.moiNguy} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'moiNguy', e.target.value)} />}</td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'moTa')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.moTa || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td><select className="w-full text-center border-none outline-none bg-transparent cursor-pointer font-bold" value={item.bac} onChange={(e) => updateRiskRowManual('ruiRo_VSLD', index, 'bac', e.target.value)}><option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></td><td className="cursor-pointer hover:bg-green-50 relative group" onClick={() => openRiskModal('ruiRo_VSLD', index, 'bienPhap')}><div className="min-h-[3rem] whitespace-pre-wrap">{item.bienPhap || <span className="text-gray-400 italic text-xs">Chạm để chọn...</span>}</div><div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><UI_Icons.CheckSquare size={14} className="text-green-500"/></div></td><td className="text-center align-middle"><button onClick={() => removeRiskRow('VSLD', index)} className="text-red-500"><UI_Icons.Trash2 width="16"/></button></td></tr>))}<tr><td colSpan="6" className="text-center p-1"><button onClick={() => addRiskRow('VSLD')} className="text-sm text-green-600 font-semibold flex items-center justify-center gap-1 w-full"><UI_Icons.Plus width="14"/> Thêm dòng VSLĐ</button></td></tr></tbody></table><div className="font-semibold">b) Ghi chú:</div><textarea className="input-line" rows="4" value={formData.ruiRo_ghiChu} onChange={e => setFormData({...formData, ruiRo_ghiChu: e.target.value})} placeholder="Các biện pháp bổ sung..."></textarea></div></div>
 
                     <div className="mb-6"><div className="font-bold mb-2">9. Trách nhiệm của các đơn vị liên quan:</div><div className="pl-4 space-y-4"><QuickInputSection title="a/ Đối với (các) đơn vị quản lý vận hành (Thực hiện cắt điện):" value={formData.muc9a_catDien} onChange={(val) => setFormData({...formData, muc9a_catDien: val})} templates={tags9a} contextData={getContextData()} placeholder="- Cắt CB..." /><QuickInputSection title="b/ Đối với đơn vị công tác (Biện pháp an toàn):" value={formData.muc9b_anToan} onChange={(val) => setFormData({...formData, muc9b_anToan: val})} templates={tags9b} placeholder="- Chuẩn bị..." /><div><label className="section-title block text-gray-800">c/ Đối với (các) đơn vị điều độ (nếu có):</label><textarea className="input-line" rows="2" value={formData.muc9c_dieuDo} onChange={e => setFormData({...formData, muc9c_dieuDo: e.target.value})}></textarea></div><div><label className="section-title block text-gray-800">d/ Những nội dung khác có liên quan đến công việc:</label><textarea className="input-line" rows="2" value={formData.muc9d_khac} onChange={e => setFormData({...formData, muc9d_khac: e.target.value})}></textarea></div></div></div>
-                    <div className="mt-8 text-justify mb-8">Biên bản này được lập thành <input className="w-10 text-center border-b border-gray-300 font-bold" value={formData.soBan} onChange={e => setFormData({...formData, soBan: e.target.value})} /> bản và được tất cả mọi người dự họp của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này.</div>
+                    <div className="mt-8 text-justify mb-8">Biên bản này được lập thành <input className="w-10 text-center border-b border-gray-300 font-bold" value={formData.soBan} onChange={e => setFormData({...formData, soBan: e.target.value})} /> bản và được tất cả mọi người dự họp là đại diện của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này (nếu không thay đổi về những nội dung chính) và ký tên dưới đây.</div>
                     <div className="grid grid-cols-2 gap-8 text-center font-bold text-xs md:text-sm uppercase mb-20"><div>ĐẠI DIỆN ĐƠN VỊ<br/>LÀM CÔNG VIỆC<br/><div className="h-20"></div>{formData.dvct_daiDien1}</div><div>ĐẠI DIỆN (CÁC) ĐƠN VỊ<br/>QUẢN LÝ VH<br/><div className="h-20"></div>{formData.qlvh_daiDien1}</div><div>ĐẠI DIỆN (CÁC)<br/>ĐƠN VỊ ĐIỀU ĐỘ<br/><div className="h-20"></div></div><div>ĐẠI DIỆN CÁC<br/>ĐƠN VỊ LIÊN QUAN<br/><div className="h-20"></div></div></div>
                     
                     {/* Phần Chụp Ảnh Mới */}
