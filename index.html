@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 4.6</title>
+    <title>Khảo Sát Hiện Trường Ver 4.8</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -1966,13 +1966,20 @@
                             </button>
                         </div>
                         
-                        {/* Ô nhập liệu chính */}
-                        <input 
-                            className="input-line w-full font-medium text-blue-800" 
+                        {/* Ô nhập liệu chính Mục 5 (Đã sửa thành Textarea để xuống dòng) */}
+                        <textarea 
+                            className="input-line w-full resize-none font-bold text-blue-900 overflow-hidden" 
+                            rows="2" 
                             value={formData.muc5_noiDung} 
-                            onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})} 
-                            placeholder="Nội dung công việc cụ thể..."
-                        />
+                            onChange={e => {
+                                setFormData({...formData, muc5_noiDung: e.target.value});
+                                // Tự động giãn chiều cao theo nội dung
+                                e.target.style.height = 'auto';
+                                e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                            style={{ minHeight: '40px' }}
+                        ></textarea>
+
                     </div>      
 
                     {/* --- MỤC 6: PHẠM VI (CÓ LIST CHỌN + NÚT DÁN TỰ ĐỘNG) --- */}
@@ -2024,12 +2031,20 @@
                                 </button>
                             </div>
                             
-                            {/* Ô nhập liệu chính */}
-                            <input 
-                                className="input-line w-full font-medium text-blue-800" 
+                            {/* Ô nhập liệu chính (Đã sửa thành Textarea để xuống dòng) */}
+                            <textarea 
+                                className="input-line w-full resize-none font-medium text-blue-800 overflow-hidden" 
+                                rows="2" // Hiển thị mặc định 2 dòng
                                 value={formData.muc6_phamVi} 
-                                onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})} 
-                            />
+                                onChange={e => {
+                                    setFormData({...formData, muc6_phamVi: e.target.value});
+                                    // Tự động giãn chiều cao khi nhập nhiều (Optional trick)
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                }}
+                                style={{ minHeight: '40px' }} // Chiều cao tối thiểu
+                            ></textarea>
+
                         </div>
                     
                     {/* Mục 7 với Input Date */}
