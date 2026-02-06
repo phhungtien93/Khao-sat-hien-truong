@@ -74,6 +74,25 @@
 
 
     const UI_Icons = {
+        NotebookPen: ({size=18}) => (
+            <svg 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+            >
+                <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                <path d="M2 6h4"/>
+                <path d="M2 10h4"/>
+                <path d="M2 14h4"/>
+                <path d="M2 18h4"/>
+                <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+            </svg>
+        ),
         Save: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
         Plus: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
         Trash2: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
@@ -403,44 +422,297 @@
         );
     };
 
+// --- COMPONENT QUẢN LÝ MỐI NGUY (V4 - CÓ XEM CHI TIẾT TRONG DANH SÁCH) ---
     const RiskManagerModal = ({ isOpen, onClose, onRefresh, existingRisks }) => {
+        // mode: 'create' | 'update' | 'list'
         const [mode, setMode] = useState('create');
-        const [selectedRiskId, setSelectedRiskId] = useState("");
+        const [selectedRiskId, setSelectedRiskId] = useState(""); // Dùng cho tab Update
+        const [expandedRiskId, setExpandedRiskId] = useState(null); // Dùng cho tab List (để mở rộng)
+        
+        // State chung
         const [name, setName] = useState("");
-        const [type, setType] = useState("ATLD");
+        const [type, setType] = useState("ATLĐ");
         const [level, setLevel] = useState("II");
         const [desc, setDesc] = useState("");
         const [measure, setMeasure] = useState("");
+        
+        // State chứa dữ liệu chi tiết (Dùng chung cho cả Update và List View)
+        const [existingDescs, setExistingDescs] = useState([]);
+        const [existingMeasures, setExistingMeasures] = useState([]);
+
         const [loading, setLoading] = useState(false);
-        useEffect(() => { if (isOpen) { setMode('create'); setSelectedRiskId(""); setName(""); setDesc(""); setMeasure(""); } }, [isOpen]);
+        const [detailLoading, setDetailLoading] = useState(false);
+
+        // Reset khi mở modal hoặc chuyển tab
+        useEffect(() => { 
+            if (isOpen) { 
+                setMode('create'); setSelectedRiskId(""); setExpandedRiskId(null);
+                setName(""); setDesc(""); setMeasure(""); 
+                setExistingDescs([]); setExistingMeasures([]);
+            } 
+        }, [isOpen]);
+
+        // Logic tải chi tiết khi chọn mối nguy ở tab UPDATE
+        useEffect(() => {
+            const fetchDetailsForUpdate = async () => {
+                if (mode === 'update' && selectedRiskId) {
+                    setLoading(true);
+                    await fetchRiskDetails(selectedRiskId);
+                    setLoading(false);
+                } else if (mode === 'update') {
+                    setExistingDescs([]); setExistingMeasures([]);
+                }
+            };
+            fetchDetailsForUpdate();
+        }, [selectedRiskId, mode]);
+
+        // Hàm dùng chung để tải chi tiết (Mô tả + Biện pháp)
+        const fetchRiskDetails = async (id) => {
+            const { data: dData } = await supabase.from('dm_mo_ta').select('*').eq('moi_nguy_id', id).order('id');
+            if (dData) setExistingDescs(dData);
+            const { data: mData } = await supabase.from('dm_bien_phap').select('*').eq('moi_nguy_id', id).order('id');
+            if (mData) setExistingMeasures(mData);
+        };
+
+        // --- XỬ LÝ KHI BẤM VÀO DÒNG TRONG DANH SÁCH (LIST) ---
+        const handleToggleDetail = async (riskId) => {
+            if (expandedRiskId === riskId) {
+                // Nếu đang mở thì đóng lại
+                setExpandedRiskId(null);
+            } else {
+                // Mở dòng mới -> Tải dữ liệu
+                setExpandedRiskId(riskId);
+                setDetailLoading(true);
+                await fetchRiskDetails(riskId);
+                setDetailLoading(false);
+            }
+        };
+
+        // --- HÀM XÓA CHI TIẾT ---
+        const handleDeleteDetail = async (table, id) => {
+            if(!confirm("Xóa dòng chi tiết này?")) return;
+            const { error } = await supabase.from(table).delete().eq('id', id);
+            if (error) alert("Lỗi xóa: " + error.message);
+            else {
+                if (table === 'dm_mo_ta') setExistingDescs(prev => prev.filter(i => i.id !== id));
+                if (table === 'dm_bien_phap') setExistingMeasures(prev => prev.filter(i => i.id !== id));
+            }
+        };
+
+        // --- HÀM XÓA MỐI NGUY ---
+        const handleDeleteRisk = async (id, riskName, e) => {
+            e.stopPropagation(); // Ngăn sự kiện click lan ra cha (gây mở rộng dòng)
+            if(!confirm(`CẢNH BÁO: Xóa mối nguy "${riskName}" sẽ xóa tất cả dữ liệu bên trong nó. Tiếp tục?`)) return;
+            
+            setLoading(true);
+            try {
+                await supabase.from('dm_mo_ta').delete().eq('moi_nguy_id', id);
+                await supabase.from('dm_bien_phap').delete().eq('moi_nguy_id', id);
+                const { error } = await supabase.from('dm_moi_nguy').delete().eq('id', id);
+                if (error) throw error;
+                alert("Đã xóa thành công!");
+                onRefresh();
+            } catch (err) {
+                alert("Lỗi khi xóa: " + err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const handleUpdateLocal = (type, index, val) => {
+            if (type === 'desc') { const newArr = [...existingDescs]; newArr[index].noi_dung = val; setExistingDescs(newArr); } 
+            else { const newArr = [...existingMeasures]; newArr[index].noi_dung = val; setExistingMeasures(newArr); }
+        };
+
         const handleSave = async () => {
-            setLoading(true); let targetRiskId = selectedRiskId;
+            setLoading(true); 
+            let targetRiskId = selectedRiskId;
+
             if (mode === 'create') {
                 if (!name.trim()) { alert("Vui lòng nhập tên mối nguy!"); setLoading(false); return; }
                 const { data, error } = await supabase.from('dm_moi_nguy').insert([{ ten_moi_nguy: name.trim(), bac_rr_mac_dinh: level, loai: type }]).select();
                 if (error) { alert("Lỗi lưu: " + error.message); setLoading(false); return; }
                 targetRiskId = data[0].id;
-            } else { if (!targetRiskId) { alert("Vui lòng chọn mối nguy!"); setLoading(false); return; } }
+            } else if (mode === 'update') { 
+                if (!targetRiskId) { alert("Vui lòng chọn mối nguy!"); setLoading(false); return; } 
+                for (const item of existingDescs) { await supabase.from('dm_mo_ta').update({ noi_dung: item.noi_dung }).eq('id', item.id); }
+                for (const item of existingMeasures) { await supabase.from('dm_bien_phap').update({ noi_dung: item.noi_dung }).eq('id', item.id); }
+            }
+
             const descInserts = desc.split('\n').map(l => l.trim()).filter(l => l).map(d => ({ moi_nguy_id: targetRiskId, noi_dung: d }));
             const measureInserts = measure.split('\n').map(l => l.trim()).filter(l => l).map(m => ({ moi_nguy_id: targetRiskId, noi_dung: m }));
+            
             if (descInserts.length > 0) await supabase.from('dm_mo_ta').insert(descInserts);
             if (measureInserts.length > 0) await supabase.from('dm_bien_phap').insert(measureInserts);
-            alert("Đã lưu thành công!"); onRefresh(); onClose(); setLoading(false);
+
+            alert("Đã lưu thành công!"); onRefresh(); 
+            if(mode === 'create') { setName(""); setDesc(""); setMeasure(""); }
+            setLoading(false);
         };
+
+        const atldList = existingRisks.filter(r => r.loai === 'ATLĐ' || r.loai === 'ATLD');
+        const vsldList = existingRisks.filter(r => r.loai === 'VSLĐ' || r.loai === 'VSLD');
+
+        // Render từng dòng trong danh sách
+        const renderRiskRow = (r) => {
+            const isExpanded = expandedRiskId === r.id;
+            return (
+                <div key={r.id} className="border rounded bg-white shadow-sm overflow-hidden mb-2 transition-all">
+                    {/* Header dòng: Click để mở rộng */}
+                    <div 
+                        className={`flex justify-between items-center p-3 cursor-pointer hover:bg-gray-50 ${isExpanded ? 'bg-blue-50 border-b border-blue-100' : ''}`}
+                        onClick={() => handleToggleDetail(r.id)}
+                    >
+                        <div className="flex items-center gap-2">
+                            {isExpanded ? <UI_Icons.Minus size={14}/> : <UI_Icons.Plus size={14}/>}
+                            <div>
+                                <div className="font-bold text-sm text-gray-800">{r.ten_moi_nguy}</div>
+                                <div className="text-xs text-gray-500">Bậc rủi ro: <span className="font-semibold text-blue-600">{r.bac_rr_mac_dinh}</span></div>
+                            </div>
+                        </div>
+                        <button onClick={(e) => handleDeleteRisk(r.id, r.ten_moi_nguy, e)} className="text-gray-400 hover:text-red-500 p-2 rounded transition-colors" title="Xóa toàn bộ">
+                            <UI_Icons.Trash2 size={18}/>
+                        </button>
+                    </div>
+
+                    {/* Nội dung chi tiết (Chỉ hiện khi Expanded) */}
+                    {isExpanded && (
+                        <div className="p-3 bg-gray-50 text-sm animate-zoom-in">
+                            {detailLoading ? (
+                                <div className="text-center text-gray-500 py-2">Đang tải chi tiết...</div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Cột Mô Tả */}
+                                    <div>
+                                        <div className="font-bold text-gray-700 mb-1 border-b border-gray-200 pb-1">Mô tả / Nguyên nhân:</div>
+                                        {existingDescs.length === 0 ? <div className="text-gray-400 italic text-xs">Chưa có mô tả</div> : (
+                                            <ul className="list-disc list-inside space-y-1 text-gray-700">
+                                                {existingDescs.map(d => <li key={d.id} className="pl-1">{d.noi_dung}</li>)}
+                                            </ul>
+                                        )}
+                                    </div>
+                                    {/* Cột Biện Pháp */}
+                                    <div>
+                                        <div className="font-bold text-gray-700 mb-1 border-b border-gray-200 pb-1">Biện pháp kiểm soát:</div>
+                                        {existingMeasures.length === 0 ? <div className="text-gray-400 italic text-xs">Chưa có biện pháp</div> : (
+                                            <ul className="list-disc list-inside space-y-1 text-gray-700">
+                                                {existingMeasures.map(m => <li key={m.id} className="pl-1">{m.noi_dung}</li>)}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         if (!isOpen) return null;
+
         return (
             <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4" onClick={onClose}>
                 <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                    <div className="p-4 border-b bg-blue-600 text-white rounded-t-lg flex justify-between items-center"><h3 className="font-bold text-lg flex items-center gap-2"><UI_Icons.Database /> Quản Lý Thư Viện</h3><button onClick={onClose}><UI_Icons.X size={20}/></button></div>
-                    <div className="p-5 overflow-y-auto flex-1 space-y-4">
-                        <div className="flex border rounded overflow-hidden mb-4"><button className={`flex-1 py-2 font-bold ${mode === 'create' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-500'}`} onClick={() => setMode('create')}>Tạo Mới</button><button className={`flex-1 py-2 font-bold ${mode === 'update' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-500'}`} onClick={() => setMode('update')}>Cập Nhật</button></div>
-                        {mode === 'create' ? (
-                            <><div className="mb-2"><label className="block text-sm font-bold text-gray-700 mb-1">Tên mối nguy *</label><input className="w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-1">Loại</label><select className="w-full border rounded p-2" value={type} onChange={e => setType(e.target.value)}><option value="ATLD">ATLD</option><option value="VSLD">VSLD</option></select></div><div><label className="block text-sm font-bold text-gray-700 mb-1">Bậc RR</label><select className="w-full border rounded p-2" value={level} onChange={e => setLevel(e.target.value)}><option value="II">II</option><option value="I">I</option><option value="III">III</option></select></div></div></>
-                        ) : (<div><label className="block text-sm font-bold text-gray-700 mb-1">Chọn mối nguy *</label><select className="w-full border rounded p-2" value={selectedRiskId} onChange={e => setSelectedRiskId(e.target.value)}><option value="">-- Chọn --</option>{existingRisks.map(r => (<option key={r.id} value={r.id}>{r.ten_moi_nguy} ({r.loai})</option>))}</select></div>)}
-                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Thêm Mô tả (mỗi dòng 1 ý)</label><textarea className="w-full border rounded p-2" rows="3" value={desc} onChange={e => setDesc(e.target.value)}></textarea></div>
-                        <div><label className="block text-sm font-bold text-gray-700 mb-1">Thêm Biện pháp (mỗi dòng 1 ý)</label><textarea className="w-full border rounded p-2" rows="3" value={measure} onChange={e => setMeasure(e.target.value)}></textarea></div>
+                    <div className="p-4 border-b bg-blue-600 text-white rounded-t-lg flex justify-between items-center">
+                        <h3 className="font-bold text-lg flex items-center gap-2"><UI_Icons.Database /> Quản Lý Thư Viện</h3>
+                        <button onClick={onClose}><UI_Icons.X size={20}/></button>
                     </div>
-                    <div className="p-4 border-t flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 border rounded">Hủy</button><button onClick={handleSave} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">{loading ? "..." : "Lưu"}</button></div>
+                    
+                    <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                        {/* Tab chuyển đổi */}
+                        <div className="flex border rounded overflow-hidden mb-4 shadow-sm bg-gray-100 p-1 gap-1">
+                            <button className={`flex-1 py-1.5 rounded font-bold text-sm transition-all ${mode === 'create' ? 'bg-white text-blue-700 shadow' : 'text-gray-500 hover:bg-gray-200'}`} onClick={() => setMode('create')}>Tạo Mới</button>
+                            <button className={`flex-1 py-1.5 rounded font-bold text-sm transition-all ${mode === 'update' ? 'bg-white text-blue-700 shadow' : 'text-gray-500 hover:bg-gray-200'}`} onClick={() => setMode('update')}>Sửa ND</button>
+                            <button className={`flex-1 py-1.5 rounded font-bold text-sm transition-all ${mode === 'list' ? 'bg-white text-blue-700 shadow' : 'text-gray-500 hover:bg-gray-200'}`} onClick={() => setMode('list')}>Danh Sách</button>
+                        </div>
+
+                        {/* --- TAB 1: TẠO MỚI --- */}
+                        {mode === 'create' && (
+                            <div className="space-y-3 bg-gray-50 p-3 rounded border">
+                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Tên mối nguy *</label><input className="w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} placeholder="VD: Làm việc trên cao" /></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-bold text-gray-700 mb-1">Loại</label><select className="w-full border rounded p-2" value={type} onChange={e => setType(e.target.value)}><option value="ATLĐ">ATLĐ</option><option value="VSLĐ">VSLĐ</option></select></div>
+                                    <div><label className="block text-sm font-bold text-gray-700 mb-1">Bậc RR</label><select className="w-full border rounded p-2" value={level} onChange={e => setLevel(e.target.value)}><option value="II">II</option><option value="I">I</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option></select></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- TAB 2: CẬP NHẬT --- */}
+                        {mode === 'update' && (
+                            <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Chọn mối nguy cần sửa *</label>
+                                <select className="w-full border rounded p-2 font-bold text-blue-800" value={selectedRiskId} onChange={e => setSelectedRiskId(e.target.value)}>
+                                    <option value="">-- Chọn mối nguy --</option>
+                                    {existingRisks.map(r => (<option key={r.id} value={r.id}>{r.ten_moi_nguy} ({r.loai})</option>))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* --- TAB 3: DANH SÁCH (CÓ EXPAND) --- */}
+                        {mode === 'list' && (
+                            <div className="space-y-6">
+                                {/* Nhóm ATLĐ */}
+                                <div>
+                                    <div className="bg-blue-100 text-blue-800 px-3 py-1.5 font-bold text-sm rounded mb-2 sticky top-0 z-10 border border-blue-200">ATLĐ (An toàn lao động)</div>
+                                    <div className="space-y-1">
+                                        {atldList.length === 0 ? <div className="text-gray-400 italic text-xs ml-2">Chưa có dữ liệu</div> : atldList.map(r => renderRiskRow(r))}
+                                    </div>
+                                </div>
+                                {/* Nhóm VSLĐ */}
+                                <div>
+                                    <div className="bg-green-100 text-green-800 px-3 py-1.5 font-bold text-sm rounded mb-2 sticky top-0 z-10 border border-green-200">VSLĐ (Vệ sinh lao động)</div>
+                                    <div className="space-y-1">
+                                        {vsldList.length === 0 ? <div className="text-gray-400 italic text-xs ml-2">Chưa có dữ liệu</div> : vsldList.map(r => renderRiskRow(r))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- PHẦN NHẬP CHI TIẾT (Create & Update) --- */}
+                        {(mode === 'create' || mode === 'update') && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Mô tả (Nguyên nhân):</label>
+                                    {mode === 'update' && existingDescs.length > 0 && (
+                                        <div className="mb-2 space-y-2 max-h-40 overflow-y-auto border p-2 rounded bg-gray-50">
+                                            {existingDescs.map((item, i) => (
+                                                <div key={item.id} className="flex gap-2 items-center">
+                                                    <input className="flex-1 border rounded px-2 py-1 text-sm text-gray-700" value={item.noi_dung} onChange={(e) => handleUpdateLocal('desc', i, e.target.value)} />
+                                                    <button onClick={() => handleDeleteDetail('dm_mo_ta', item.id)} className="text-red-500 hover:bg-red-100 p-1 rounded"><UI_Icons.Trash2 size={16}/></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <textarea className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-200 outline-none" rows="2" placeholder="Nhập mô tả mới (xuống dòng để tách ý)..." value={desc} onChange={e => setDesc(e.target.value)}></textarea>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Biện pháp kiểm soát:</label>
+                                    {mode === 'update' && existingMeasures.length > 0 && (
+                                        <div className="mb-2 space-y-2 max-h-40 overflow-y-auto border p-2 rounded bg-gray-50">
+                                            {existingMeasures.map((item, i) => (
+                                                <div key={item.id} className="flex gap-2 items-center">
+                                                    <input className="flex-1 border rounded px-2 py-1 text-sm text-gray-700" value={item.noi_dung} onChange={(e) => handleUpdateLocal('measure', i, e.target.value)} />
+                                                    <button onClick={() => handleDeleteDetail('dm_bien_phap', item.id)} className="text-red-500 hover:bg-red-100 p-1 rounded"><UI_Icons.Trash2 size={16}/></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <textarea className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-200 outline-none" rows="2" placeholder="Nhập biện pháp mới (xuống dòng để tách ý)..." value={measure} onChange={e => setMeasure(e.target.value)}></textarea>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-lg">
+                        <button onClick={onClose} className="px-4 py-2 border rounded hover:bg-gray-200 transition-colors">Đóng</button>
+                        {mode !== 'list' && (
+                            <button onClick={handleSave} disabled={loading} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow-md transition-all active:scale-95 flex items-center gap-2">
+                                {loading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <UI_Icons.Save size={18}/>}
+                                Lưu Lại
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -552,7 +824,7 @@
                 <div className="bg-white border-b px-3 py-2 shadow-sm flex items-center justify-between shrink-0 h-14 relative z-20">
                     <div className="flex items-center gap-2">
                         <h2 className="text-base font-bold text-blue-800 uppercase flex items-center gap-1">
-                            <UI_Icons.Database size={18} /> Kho Dữ Liệu
+                            <UI_Icons.NotebookPen size={18} /> KHẢO SÁT HIỆN TRƯỜNG
                         </h2>
                     </div>
                     
