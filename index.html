@@ -1966,18 +1966,12 @@
                             </button>
                         </div>
                         
-                        {/* Ô nhập liệu chính Mục 5 (Đã sửa thành Textarea để xuống dòng) */}
+                        {/* Ô nhập liệu chính Mục 5 (Đã sửa: Bỏ in đậm, dùng font-medium cho đều) */}
                         <textarea 
-                            className="input-line w-full resize-none font-bold text-blue-900 overflow-hidden" 
+                            className="input-line w-full resize-none font-medium text-blue-900" // Sửa font-bold -> font-medium
                             rows="2" 
                             value={formData.muc5_noiDung} 
-                            onChange={e => {
-                                setFormData({...formData, muc5_noiDung: e.target.value});
-                                // Tự động giãn chiều cao theo nội dung
-                                e.target.style.height = 'auto';
-                                e.target.style.height = e.target.scrollHeight + 'px';
-                            }}
-                            style={{ minHeight: '40px' }}
+                            onChange={e => setFormData({...formData, muc5_noiDung: e.target.value})}
                         ></textarea>
 
                     </div>      
@@ -2031,18 +2025,12 @@
                                 </button>
                             </div>
                             
-                            {/* Ô nhập liệu chính (Đã sửa thành Textarea để xuống dòng) */}
+                            {/* Ô nhập liệu chính Mục 6 (Đã sửa: Có thanh cuộn giống Mục 4) */}
                             <textarea 
-                                className="input-line w-full resize-none font-medium text-blue-800 overflow-hidden" 
-                                rows="2" // Hiển thị mặc định 2 dòng
+                                className="input-line w-full resize-none font-medium text-blue-800" // Đã xóa overflow-hidden
+                                rows="2" 
                                 value={formData.muc6_phamVi} 
-                                onChange={e => {
-                                    setFormData({...formData, muc6_phamVi: e.target.value});
-                                    // Tự động giãn chiều cao khi nhập nhiều (Optional trick)
-                                    e.target.style.height = 'auto';
-                                    e.target.style.height = e.target.scrollHeight + 'px';
-                                }}
-                                style={{ minHeight: '40px' }} // Chiều cao tối thiểu
+                                onChange={e => setFormData({...formData, muc6_phamVi: e.target.value})}
                             ></textarea>
 
                         </div>
