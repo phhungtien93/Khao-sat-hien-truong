@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 4.8</title>
+    <title>Khảo Sát Hiện Trường Ver 5.2</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -24,7 +24,16 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 14px; }
         th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
         th { background-color: #f9fafb; font-weight: bold; text-align: center; }
-        .tag-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .tag-btn { 
+            display: inline-flex; align-items: center; 
+            gap: 1px;              /* Giảm khoảng cách icon và chữ */
+            padding: 3px 7px;      /* Giảm độ dày nút */
+            border-radius: 9999px; 
+            font-size: 13px;       /* Giảm cỡ chữ xuống 10px (hoặc 11px) */
+            font-weight: 500;      /* Tăng độ đậm để chữ nhỏ vẫn dễ đọc */
+            background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s;
+            white-space: nowrap; 
+        }
         .tag-btn:active { transform: scale(0.95); background-color: #dbeafe; }
         .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .camera-btn { background: #e0f2fe; border: 2px dashed #3b82f6; color: #1d4ed8; transition: all 0.2s; }
@@ -371,26 +380,59 @@
     };
 
     const QuickInputSection = ({ title, value, onChange, templates, placeholder, contextData }) => {
-        const addTemplate = (template) => {
-            let textToAdd = template;
-            if (contextData) {
-                const fullPoleCode = `${contextData.code}/${contextData.sub}`;
-                textToAdd = textToAdd.replace(/{tru}/g, fullPoleCode).replace(/{tuyen}/g, contextData.line || "...");
+        // 1. Tạo tham chiếu để tương tác với thanh cuộn
+        const scrollRef = useRef(null);
+
+        // 2. Thêm sự kiện: Khi lăn chuột tại vùng này -> chuyển thành lăn ngang
+        useEffect(() => {
+            const el = scrollRef.current;
+            if (el) {
+                const onWheel = (e) => {
+                    if (e.deltaY === 0) return;
+                    e.preventDefault();
+                    el.scrollLeft += e.deltaY; 
+                };
+                el.addEventListener('wheel', onWheel, { passive: false });
+                return () => el.removeEventListener('wheel', onWheel);
             }
-            const newValue = value ? value + "\n" + textToAdd : textToAdd;
+        }, []);
+
+        const addTemplate = (templateObj) => {
+            // Logic lấy nội dung từ object mẫu
+            let textToAdd = templateObj.content || templateObj; // Hỗ trợ cả object cũ và mới
+
+            if (contextData) {
+                const fullPoleCode = `${contextData.code}${contextData.sub ? "/" + contextData.sub : ""}`;
+                const mainPoleCode = contextData.code || "...";
+                
+                textToAdd = textToAdd
+                    .replace(/{tru_chinh}/g, mainPoleCode)
+                    .replace(/{tru}/g, fullPoleCode)
+                    .replace(/{tuyen}/g, contextData.line || "...");
+            }
+            
+            // Logic nối chuỗi: Nếu inline=true thì dùng dấu phẩy, ngược lại xuống dòng
+            const separator = templateObj.inline ? " " : "\n";
+            const newValue = value ? value + separator + textToAdd : textToAdd;
+            
             onChange(newValue);
         };
+
         return (
             <div className="mb-4">
                 <label className="section-title block text-gray-800">{title}</label>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar mb-2 pb-1">
-                    {templates.map((t, i) => (<button key={i} onClick={() => addTemplate(t.content)} className="tag-btn flex-shrink-0"><UI_Icons.Plus size={12}/> {t.label}</button>))}
+                <div ref={scrollRef} className="flex gap-2 overflow-x-auto no-scrollbar mb-2 pb-1 cursor-grab active:cursor-grabbing">
+                    {templates.map((t, i) => (
+                        <button key={i} onClick={() => addTemplate(t)} className="tag-btn flex-shrink-0">
+                            <UI_Icons.Plus size={12}/> {t.label}
+                        </button>
+                    ))}
                     <button onClick={() => onChange("")} className="tag-btn flex-shrink-0 bg-red-50 text-red-600 border-red-200">Xóa</button>
                 </div>
                 <textarea className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows="4" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}></textarea>
             </div>
         );
-    };
+    }; // <--- BẠN HAY BỊ THIẾU DẤU NÀY
 
     // --- MODAL XEM ẢNH (QUẢN LÝ) ---
     const ImageGalleryModal = ({ images, onClose, onZoom }) => {
@@ -916,7 +958,12 @@
         const fetchReports = async (searchCode = filterCode, searchDate = filterDate) => {
             setLoading(true);
             try {
-                let query = supabase.from('bien_ban_khao_sat').select('*').order('created_at', { ascending: false });
+                // Sắp xếp ưu tiên ngày thực hiện mới nhất lên đầu
+                let query = supabase
+                    .from('bien_ban_khao_sat')
+                    .select('*')
+                    .order('ngay_thuc_hien', { ascending: false, nullsFirst: false }) 
+                    .order('created_at', { ascending: false }); // Dự phòng nếu ngày thực hiện bị trống
                 if (searchCode && searchCode.trim()) query = query.ilike('ma_tru', `%${searchCode.trim()}%`);
                 if (searchDate) {
                     const startDate = new Date(searchDate); startDate.setHours(0, 0, 0, 0);
@@ -1021,11 +1068,27 @@
                                             <div key={r.id} className="px-3 py-2.5 hover:bg-blue-50 transition-colors group cursor-default">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                        <div className="font-bold text-blue-800 text-base leading-tight mb-1 truncate">{r.ma_tru || "---"}</div>
+                                                        {/* DÒNG 1: ĐỊA ĐIỂM ĐẦY ĐỦ (Lấy từ cột ma_tru) */}
+                                                        <div className="font-bold text-blue-800 text-base leading-tight mb-1 truncate" title={r.ma_tru}>
+                                                            {r.ma_tru || "---"}
+                                                        </div>
+                                                        
+                                                        {/* DÒNG 2: NGÀY THỰC HIỆN | NỘI DUNG CÔNG VIỆC */}
                                                         <div className="flex items-center text-sm text-gray-600 gap-2">
-                                                            <span className="truncate max-w-[140px] sm:max-w-[200px]" title={r.ten_tuyen}>{r.ten_tuyen || "(Chưa có tên tuyến)"}</span>
+                                                            {/* Phần 1: Ngày thực hiện (Đưa lên trước) */}
+                                                            <span className="font-medium text-gray-700 whitespace-nowrap shrink-0">
+                                                                {r.ngay_thuc_hien 
+                                                                    ? r.ngay_thuc_hien.split('-').reverse().join('/') 
+                                                                    : formatDateTime(r.created_at)}
+                                                            </span>
+
+                                                            {/* Phần 2: Dấu gạch đứng */}
                                                             <span className="text-gray-300">|</span>
-                                                            <span className="font-medium text-gray-700 whitespace-nowrap">{formatDateTime(r.created_at)}</span>
+
+                                                            {/* Phần 3: Nội dung công việc (Lấy từ cột ten_tuyen) */}
+                                                            <span className="truncate" title={r.ten_tuyen}>
+                                                                {r.ten_tuyen || "(Chưa có nội dung)"}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0 self-center">
@@ -1108,6 +1171,7 @@
             donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ", 
             ngay: new Date().getDate(), thang: new Date().getMonth() + 1, nam: new Date().getFullYear(), gioKhaoSat: "07:30",
             loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
+            is_range: false, loc_poleCode_to: "", loc_subCode_to: "",
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
             qlvh_daiDien1: "", qlvh_chucVu1: "", qlvh_donVi1: "", qlvh_daiDien2: "", qlvh_chucVu2: "", qlvh_donVi2: "",
             qlvh_daiDien3: "", qlvh_chucVu3: "", qlvh_donVi3: "",
@@ -1118,7 +1182,7 @@
             ruiRo_ATLD: [{ riskId: 1, moiNguy: "Phóng điện", moTa: "Điện hạ áp giật", bac: "II", bienPhap: "Thực hiện biện pháp an toàn..." }],
             ruiRo_VSLD: [{ riskId: null, moiNguy: "", moTa: "", bac: "", bienPhap: "" }],
             ruiRo_ghiChu: "- Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt.\n- Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp.\n- Đặt rào chắn xung quanh vị trí công tác.\n- Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao.\n- Tránh làm việc khi thời tiết quá nóng.",
-            muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị đầy đủ trang thiết bị...", muc9c_dieuDo: "", muc9d_khac: "", soBan: "01",
+            muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện đúng thời gian đăng ký.", muc9c_dieuDo: "", muc9d_khac: "", soBan: "01",
             hinh_anh: [] // Mảng chứa URL ảnh
         };
 
@@ -1162,9 +1226,42 @@
             fetchData();
         }, []);
 
-        const handlePoleChange = (e) => { const selectedCode = e.target.value; const found = dbPoles.find(p => p.code === selectedCode); setFormData(prev => ({ ...prev, loc_poleCode: selectedCode, loc_lineName: found ? found.line_name : "" })); };
-        const tags9a = [ { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" }, { label: "Cắt 3 FCO", content: "- Cắt 03FCO trụ {tru} tuyến {tuyen}" }, { label: "Cắt 2 FCO", content: "- Cắt 02FCO trụ {tru} tuyến {tuyen}" }, { label: "Tiếp địa HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" }, { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" } ];
-        const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị đầy đủ trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ BHLĐ.\n- Không vượt khỏi phạm vi làm việc.\n- Trả điện đúng giờ." }, { label: "Thêm dây an toàn", content: "- Sử dụng dây an toàn 2 móc khi leo cao." }, { label: "Thêm rào chắn", content: "- Đặt rào chắn, biển báo an toàn." } ];
+        const handlePoleChange = (e) => { 
+            const selectedCode = e.target.value; 
+            const found = dbPoles.find(p => p.code === selectedCode);
+            
+            setFormData(prev => ({ 
+                ...prev, 
+                loc_poleCode: selectedCode, 
+                
+                // --- CẬP NHẬT MỚI: Tự động copy sang trụ ĐẾN luôn ---
+                loc_poleCode_to: selectedCode, 
+                // ----------------------------------------------------
+
+                // Logic cũ: Tự tìm tên tuyến (nếu có trong DB thì lấy, không thì giữ nguyên cái cũ để không bị xóa mất tuyến đã nhập)
+                loc_lineName: found ? found.line_name : (prev.loc_lineName || "")
+            })); 
+        };
+
+        const tags9a = [ 
+        { label: "trụ", content: "trụ", inline: true },
+        { label: "Trụ", content: "{tru_chinh}/", inline: true },
+        { label: "tuyến", content: "tuyến", inline: true }, 
+        { label: "Tuyến", content: "{tuyen}", inline: true },
+        { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}" }, 
+        { label: "Cắt 1FCO", content: "- Cắt 01 FCO trụ {tru} tuyến {tuyen}" }, 
+        { label: "Cắt 2FCO", content: "- Cắt 02 FCO trụ {tru} tuyến {tuyen}" }, 
+        { label: "Cắt 3FCO", content: "- Cắt 03 FCO trụ {tru} tuyến {tuyen}" }, 
+        { label: "TĐ HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}" }, 
+        { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}" }, 
+        { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}" }, 
+        { label: "TĐ TT", content: "- Thử điện, tiếp địa trung áp 02 bộ tại trụ {tru} tuyến {tuyen}" },
+        { label: "Cắt 3LBFCO", content: "- Cắt 03 LBFCO trụ {tru_chinh}/ tuyến {tuyen}" },
+        { label: "Cắt MC", content: "- Cắt MC + 03 DS trụ {tru_chinh}/ tuyến {tuyen}" },
+        { label: "Cắt LBS", content: "- Cắt LBS + 03 DS trụ {tru_chinh}/ tuyến {tuyen}" },
+        ];
+
+        const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện đúng thời gian đăng ký." } ];
 
         // --- QUẢN LÝ LIST MẪU TỪ DB ---
         const [taskTemplates, setTaskTemplates] = useState([]);
@@ -1296,6 +1393,20 @@
             const dateMuc7 = formatDateVN(sourceForm.muc7_ngay);
             const datePhieu = formatDateVN(sourceForm.phieu_dgrr_ngay);
 
+                        // --- XỬ LÝ CHUỖI ĐỊA ĐIỂM ---
+                        let locationString = "";
+                        const pStart = `${sourceForm.loc_poleCode}${sourceForm.loc_subCode ? "/" + sourceForm.loc_subCode : ""}`;
+
+                        if (sourceForm.is_range) {
+                            // Nếu là chế độ khoảng: Từ trụ... đến trụ...
+                            const pEnd = `${sourceForm.loc_poleCode_to}${sourceForm.loc_subCode_to ? "/" + sourceForm.loc_subCode_to : ""}`;
+                            locationString = `từ trụ ${pStart} đến trụ ${pEnd}`;
+                        } else {
+                            // Nếu là chế độ đơn: Tại trụ...
+                            locationString = `tại trụ ${pStart}`;
+                        }
+
+
             const doc = new Document({
                 sections: [{
                     properties: {},
@@ -1370,9 +1481,10 @@
                         createPara("BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG", true, 28, AlignmentType.CENTER),
                         createPara("", false, 24),
                         
-                        createPara(`Vào hồi ${sourceForm.gioKhaoSat}, tại trụ ${sourceForm.loc_poleCode}/${sourceForm.loc_subCode} tuyến ${sourceForm.loc_lineName}, xã ${sourceForm.loc_commune}, tỉnh An Giang.`, false, 24, AlignmentType.JUSTIFIED),
-                        
 
+                        // --- [SỬA LỖI] CHỈ GỌI BIẾN locationString ĐÃ TÍNH Ở TRÊN ---
+                        createPara(`Vào hồi ${sourceForm.gioKhaoSat}, ${locationString} tuyến ${sourceForm.loc_lineName}, xã ${sourceForm.loc_commune}, tỉnh An Giang.`, false, 24, AlignmentType.JUSTIFIED),
+                        
 
                         createPara("Chúng tôi gồm:", true, 24),
                         
@@ -1652,15 +1764,60 @@
             Packer.toBlob(doc).then(blob => { saveAs(blob, filename); });
         };
 
-        const handleSaveCloud = async () => {
+      const handleSaveCloud = async () => {
             if (!confirm("Bạn có đồng ý lưu biên bản này và thoát ra màn hình chính không?")) return;
-            if (!formData.loc_poleCode) { alert("Vui lòng nhập Mã trụ trước khi lưu!"); return; }
-            const payload = { ma_tru: formData.loc_poleCode + (formData.loc_subCode ? '/' + formData.loc_subCode : ''), ten_tuyen: formData.loc_lineName, du_lieu_form: formData, du_lieu_so_do: diagramData, updated_at: new Date().toISOString() };
+            
+            // Kiểm tra dữ liệu bắt buộc
+            if (!formData.loc_poleCode) { 
+                alert("Vui lòng nhập Mã trụ trước khi lưu!"); 
+                return;
+            }
+
+            // --- 1. TẠO CHUỖI ĐỊA ĐIỂM ĐẦY ĐỦ (Dùng làm ma_tru) ---
+            const truStart = formData.loc_poleCode || "...";
+            const subStart = formData.loc_subCode ? "/" + formData.loc_subCode : "";
+            const tuyen = formData.loc_lineName || "...";
+            
+            let fullLocation = "";
+            if (formData.is_range) {
+                // Chế độ Từ... Đến...
+                const truEnd = formData.loc_poleCode_to || "...";
+                const subEnd = formData.loc_subCode_to ? "/" + formData.loc_subCode_to : "";
+                fullLocation = `Từ trụ ${truStart}${subStart} đến trụ ${truEnd}${subEnd} tuyến ${tuyen}`;
+            } else {
+                // Chế độ Tại...
+                fullLocation = `Tại trụ ${truStart}${subStart} tuyến ${tuyen}`;
+            }
+
+            // --- 2. KHAI BÁO PAYLOAD (Đây là phần bạn bị thiếu/lỗi) ---
+            const payload = { 
+                ma_tru: fullLocation,               // Lưu địa điểm hiển thị vào cột mã trụ
+                ten_tuyen: formData.muc5_noiDung,   // Lưu nội dung công việc vào cột tên tuyến
+                du_lieu_form: formData,             // Lưu toàn bộ dữ liệu gốc
+                du_lieu_so_do: diagramData,         // Lưu sơ đồ
+                updated_at: new Date().toISOString(),
+                ngay_thuc_hien: formData.muc7_ngay  // Lưu ngày thực hiện để sắp xếp
+            };
+            
+            // --- 3. GỌI SUPABASE ---
             let error;
-            if (currentReportId) { const res = await supabase.from('bien_ban_khao_sat').update(payload).eq('id', currentReportId); error = res.error; } 
-            else { const res = await supabase.from('bien_ban_khao_sat').insert([payload]).select(); error = res.error; }
-            if (error) alert("Lỗi khi lưu: " + error.message);
-            else { alert("Đã lưu thành công!"); setShowReportList(true); }
+            if (currentReportId) { 
+                // Nếu đang sửa -> Update
+                const res = await supabase.from('bien_ban_khao_sat').update(payload).eq('id', currentReportId); 
+                error = res.error; 
+            } else { 
+                // Nếu tạo mới -> Insert
+                const res = await supabase.from('bien_ban_khao_sat').insert([payload]).select(); 
+                error = res.error; 
+            }
+            
+            // --- 4. XỬ LÝ KẾT QUẢ ---
+            if (error) {
+                alert("Lỗi khi lưu: " + error.message);
+            } else { 
+                alert("Đã lưu thành công!"); 
+                setShowReportList(true); 
+            }
         };
 
         const handleLoadReport = async (id) => {
@@ -1866,7 +2023,43 @@
                 <div className="a4-paper">
                     <div className="flex justify-between mb-6 text-center text-sm"><div className="w-1/2"><div className="font-bold uppercase">CÔNG TY ĐIỆN LỰC AN GIANG</div><input className="input-line text-center uppercase font-bold" value={formData.donVi} onChange={e => setFormData({...formData, donVi: e.target.value})} /><hr className="w-1/3 mx-auto mt-1 border-gray-400" /></div><div className="w-1/2"><div className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div><div className="font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</div><div className="mt-2 italic">Châu Phú, ngày <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.ngay} onChange={e => setFormData({...formData, ngay: e.target.value})} /> tháng <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.thang} onChange={e => setFormData({...formData, thang: e.target.value})} /> năm <input type="number" className="w-12 text-center border-b border-gray-300 outline-none" value={formData.nam} onChange={e => setFormData({...formData, nam: e.target.value})} /></div></div></div>
                     <h1 className="text-xl font-bold text-center mb-4 uppercase">BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG</h1>
-                    <div className="mb-4 text-justify flex flex-wrap items-end gap-1 text-[15px] leading-7"><span>Vào hồi</span><div className="mx-1"><TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} /></div><span>tại trụ</span><input list="pole-list" className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Chọn/Nhập mã..." /><span>/</span><input className="border-b border-gray-300 outline-none font-bold w-45 text-center" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="..." /><span>tuyến</span><input list="line-list" className="font-bold border-b border-gray-300 w-[180px] px-1 text-center text-blue-800 bg-transparent outline-none" value={formData.loc_lineName} onChange={e => setFormData({...formData, loc_lineName: e.target.value})} placeholder="..." /><span>, xã</span><select className="border-b border-gray-300 font-bold bg-transparent outline-none min-w-[80px]" value={formData.loc_commune} onChange={e => setFormData({...formData, loc_commune: e.target.value})}><option value="">Chọn xã</option>{dbCommunes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><span>, tỉnh An Giang.</span></div>
+                    <div className="mb-4 text-justify flex flex-wrap items-end gap-1 text-[15px] leading-7"><span>Vào hồi</span><div className="mx-1"><TimeSelect value={formData.gioKhaoSat} onChange={(val) => setFormData({...formData, gioKhaoSat: val})} /></div>
+                    {/* --- NÚT CHUYỂN CHẾ ĐỘ --- */}
+                    <button 
+                        onClick={() => setFormData(prev => ({...prev, is_range: !prev.is_range}))}
+                        className="mx-1 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500 text-blue-600 hover:bg-blue-50"
+                        title="Bấm để chuyển đổi giữa 'Tại trụ' và 'Từ trụ...Đến trụ...'"
+                    >
+                        {formData.is_range ? "TỪ TRỤ... ĐẾN..." : "TẠI TRỤ..."}
+                    </button>
+
+                    {/* --- LOGIC HIỂN THỊ --- */}
+                    {formData.is_range ? (
+                        // GIAO DIỆN TỪ... ĐẾN...
+                        <>
+                            <span>từ trụ</span>
+                            <input list="pole-list" className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Đầu" />
+                            <span>/</span>
+                            <input className="border-b border-gray-300 outline-none font-bold w-45 text-center" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="..." />
+                            
+                            <span>đến trụ</span>
+                            <input list="pole-list" className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" value={formData.loc_poleCode_to} onChange={e => setFormData({...formData, loc_poleCode_to: e.target.value})} placeholder="Cuối" />
+                            <span>/</span>
+                            <input className="border-b border-gray-300 outline-none font-bold w-45 text-center" value={formData.loc_subCode_to} onChange={e => setFormData({...formData, loc_subCode_to: e.target.value})} placeholder="..." />
+                        </>
+                    ) : (
+                        // GIAO DIỆN TẠI TRỤ (CŨ)
+                        <>
+                            <span>tại trụ</span>
+                            <input list="pole-list" className="border-b border-gray-300 font-bold bg-transparent outline-none w-[100px] text-center" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Chọn/Nhập..." />
+                            <span>/</span>
+                            <input className="border-b border-gray-300 outline-none font-bold w-45 text-center" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="..." />
+                        </>
+                    )}
+
+                    <span>tuyến</span>
+                    {/* ... đoạn phía sau giữ nguyên ... */}
+                    <input list="line-list" className="font-bold border-b border-gray-300 w-[180px] px-1 text-center text-blue-800 bg-transparent outline-none" value={formData.loc_lineName} onChange={e => setFormData({...formData, loc_lineName: e.target.value})} placeholder="..." /><span>, xã</span><select className="border-b border-gray-300 font-bold bg-transparent outline-none min-w-[90px]" value={formData.loc_commune} onChange={e => setFormData({...formData, loc_commune: e.target.value})}><option value="">Chọn xã</option>{dbCommunes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><span>, tỉnh An Giang.</span></div>
                     <div className="mb-2 font-bold">Chúng tôi gồm:</div>
                     <datalist id="pole-list">{dbPoles.map(p => <option key={p.code} value={p.code} />)}</datalist><datalist id="line-list">{[...new Set(dbPoles.map(p => p.line_name))].map((l, i) => <option key={i} value={l} />)}</datalist><datalist id="staff-list">{dbStaff.map((name, i) => <option key={i} value={name} />)}</datalist><datalist id="position-list">{dbPositions.map((pos, i) => <option key={i} value={pos} />)}</datalist><datalist id="unit-list">{dbUnits.map((u, i) => <option key={i} value={u} />)}</datalist>
                     <div className="mb-4 pl-4"><div className="font-bold">1. Đại diện Đơn vị công tác:</div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 mt-2"><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.1 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien1} onChange={e => setFormData({...formData, dvct_daiDien1: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu1} onChange={e => setFormData({...formData, dvct_chucVu1: e.target.value})} placeholder="Chọn..." /></div></div><div className="flex flex-col gap-1 border p-2 rounded bg-gray-50 border-dashed border-gray-300"><div className="flex gap-2 items-center"><span className="font-semibold text-sm">1.2 Ông (Bà):</span><input list="staff-list" className="input-line flex-grow font-bold text-blue-800" value={formData.dvct_daiDien2} onChange={e => setFormData({...formData, dvct_daiDien2: e.target.value})} placeholder="Nhập/Chọn tên..." /></div><div className="flex gap-2 items-center"><span className="text-sm">Chức vụ:</span><input list="position-list" className="input-line flex-grow bg-transparent" value={formData.dvct_chucVu2} onChange={e => setFormData({...formData, dvct_chucVu2: e.target.value})} placeholder="Chọn..." /></div></div></div></div>
@@ -1907,22 +2100,30 @@
                                 <span className="font-bold">4. Địa điểm (hoặc thiết bị) thực hiện công việc:</span>
                                 
                                 <button 
-                                    onClick={() => {
-                                        // 1. Lấy thông tin từ phần đầu
-                                        const tru = formData.loc_poleCode || "...";
-                                        const sub = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
-                                        const tuyen = formData.loc_lineName || "...";
-                                        const xa = formData.loc_commune || "...";
-                                        const textDiaDiem = `trụ ${tru}${sub} tuyến ${tuyen}, xã ${xa}, tỉnh An Giang`;
-                                        
-                                        // 2. Lấy nội dung hiện tại đang có trong ô
-                                        const currentText = formData.muc4_diaDiem || "";
+                                onClick={() => {
+                                    // 1. Logic tạo chuỗi địa điểm thông minh
+                                    const truStart = formData.loc_poleCode || "...";
+                                    const subStart = formData.loc_subCode ? "/" + formData.loc_subCode : "";
+                                    const tuyen = formData.loc_lineName || "...";
+                                    const xa = formData.loc_commune || "...";
+                                    
+                                    let textDiaDiem = "";
+                                    
+                                    if (formData.is_range) {
+                                        // Chế độ dải
+                                        const truEnd = formData.loc_poleCode_to || "...";
+                                        const subEnd = formData.loc_subCode_to ? "/" + formData.loc_subCode_to : "";
+                                        textDiaDiem = `từ trụ ${truStart}${subStart} đến trụ ${truEnd}${subEnd} tuyến ${tuyen}, xã ${xa}, tỉnh An Giang`;
+                                    } else {
+                                        // Chế độ đơn
+                                        textDiaDiem = `tại trụ ${truStart}${subStart} tuyến ${tuyen}, xã ${xa}, tỉnh An Giang`;
+                                    }
 
-                                        // 3. Nối chuỗi: Nếu đã có chữ thì thêm dấu cách + nội dung mới
-                                        const newText = currentText ? (currentText + " " + textDiaDiem) : textDiaDiem;
-
-                                        setFormData({ ...formData, muc4_diaDiem: newText });
-                                    }}
+                                    // 2. Nối chuỗi như cũ
+                                    const currentText = formData.muc4_diaDiem || "";
+                                    const newText = currentText ? (currentText + " " + textDiaDiem) : textDiaDiem;
+                                    setFormData({ ...formData, muc4_diaDiem: newText });
+                                }}
                                     className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
                                     title="Thêm địa điểm vào sau nội dung hiện tại"
                                 >
@@ -2008,18 +2209,33 @@
                                 {/* 3. Nút Dán Trụ/Tuyến tự động (+ Trụ/Tuyến) */}
                                 <button 
                                     onClick={() => {
-                                        const tru = formData.loc_poleCode || "...";
-                                        const sub = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
+                                        // 1. Lấy thông tin Trụ đầu và Tuyến
+                                        const truStart = formData.loc_poleCode || "...";
+                                        const subStart = formData.loc_subCode ? "/" + formData.loc_subCode : ""; 
                                         const tuyen = formData.loc_lineName || "...";
-                                        // Tạo chuỗi: trụ ... tuyến ...
-                                        const textAuto = `trụ ${tru}${sub} tuyến ${tuyen}`;
                                         
+                                        let textAuto = "";
+
+                                        // 2. Kiểm tra chế độ: Dải hay Đơn
+                                        if (formData.is_range) {
+                                            // Chế độ Dải: Từ trụ... đến trụ...
+                                            const truEnd = formData.loc_poleCode_to || "...";
+                                            const subEnd = formData.loc_subCode_to ? "/" + formData.loc_subCode_to : "";
+                                            textAuto = `từ trụ ${truStart}${subStart} đến trụ ${truEnd}${subEnd} tuyến ${tuyen}`;
+                                        } else {
+                                            // Chế độ Đơn: Trụ...
+                                            textAuto = `trụ ${truStart}${subStart} tuyến ${tuyen}`;
+                                        }
+
+                                        // 3. Cộng dồn vào nội dung hiện có
                                         const cur = formData.muc6_phamVi;
-                                        // Cộng dồn vào nội dung cũ (thêm khoảng trắng)
-                                        setFormData({...formData, muc6_phamVi: cur ? cur + " " + textAuto : textAuto});
+                                        setFormData({
+                                            ...formData, 
+                                            muc6_phamVi: cur ? cur + " " + textAuto : textAuto
+                                        });
                                     }}
                                     className="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
-                                    title="Tự động lấy: trụ... tuyến..."
+                                    title="Tự động điền phạm vi trụ/tuyến"
                                 >
                                     <UI_Icons.Plus size={12}/> Trụ/Tuyến
                                 </button>
@@ -2100,6 +2316,5 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
 </script>
-
 </body>
 </html>
