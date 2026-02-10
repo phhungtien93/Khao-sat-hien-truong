@@ -1291,27 +1291,61 @@
 
         const getContextData = () => { return { code: formData.loc_poleCode, sub: formData.loc_subCode, line: formData.loc_lineName }; };
         
-        const generateDiagramImage = async (data) => {
+const generateDiagramImage = async (data) => {
             if (!data || data.length === 0) return null;
             return new Promise((resolve) => {
                 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                data.forEach(obj => { if (obj.type === 'line') { minX = Math.min(minX, obj.x1, obj.x2); maxX = Math.max(maxX, obj.x1, obj.x2); minY = Math.min(minY, obj.y1, obj.y2); maxY = Math.max(maxY, obj.y1, obj.y2); } else if (obj.type === 'rect_pvlv') { minX = Math.min(minX, obj.x); maxX = Math.max(maxX, obj.x + obj.width); minY = Math.min(minY, obj.y); maxY = Math.max(maxY, obj.y + obj.height); } else { const cx = obj.x !== undefined ? obj.x : obj.cx; const cy = obj.y !== undefined ? obj.y : obj.cy; const size = 40; minX = Math.min(minX, cx - size); maxX = Math.max(maxX, cx + size); minY = Math.min(minY, cy - size); maxY = Math.max(maxY, cy + size); } });
+                
+                // 1. Tính toán khung bao (giữ nguyên logic cũ)
+                data.forEach(obj => { 
+                    if (obj.type === 'line') { minX = Math.min(minX, obj.x1, obj.x2); maxX = Math.max(maxX, obj.x1, obj.x2); minY = Math.min(minY, obj.y1, obj.y2); maxY = Math.max(maxY, obj.y1, obj.y2); } 
+                    else if (obj.type === 'rect_pvlv') { minX = Math.min(minX, obj.x); maxX = Math.max(maxX, obj.x + obj.width); minY = Math.min(minY, obj.y); maxY = Math.max(maxY, obj.y + obj.height); } 
+                    else { const cx = obj.x !== undefined ? obj.x : obj.cx; const cy = obj.y !== undefined ? obj.y : obj.cy; const size = 40; minX = Math.min(minX, cx - size); maxX = Math.max(maxX, cx + size); minY = Math.min(minY, cy - size); maxY = Math.max(maxY, cy + size); } 
+                });
+                
                 const padding = 50; minX -= padding; maxX += padding; minY -= padding; maxY += padding;
                 const width = maxX - minX; const height = maxY - minY;
-                let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" style="background-color: white;">`;
+
+                // 2. TẠO SVG (QUAN TRỌNG: Đã xóa 'background-color: white' để nền trong suốt)
+                let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}">`; // <--- ĐÃ XÓA background-color
+                
+                // ... (Phần vẽ các đối tượng giữ nguyên như cũ) ...
                 data.forEach(obj => {
                     if(obj.type === 'line') svgContent += `<line x1="${obj.x1}" y1="${obj.y1}" x2="${obj.x2}" y2="${obj.y2}" stroke="black" stroke-width="${obj.strokeWidth}" stroke-dasharray="${obj.dash?'5,5':'none'}" />`;
                     if(obj.type === 'circle') svgContent += `<circle cx="${obj.cx}" cy="${obj.cy}" r="4" fill="black" />`;
-                    if(obj.type === 'text') svgContent += `<text x="${obj.x}" y="${obj.y}" font-family="Arial" font-size="${obj.fontSize}" transform="rotate(${obj.rotate||0}, ${obj.x}, ${obj.y})">${obj.text}</text>`;
-                    if(obj.type === 'icon_device') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`; if(['FCO', 'LBFCO'].includes(obj.subType)) svgContent += `<line x1="-20" y1="-20" x2="20" y2="20" stroke="black" stroke-width="2"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" stroke-width="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill="${obj.subType==='LBFCO'?'black':'none'}" stroke="black" stroke-width="2"/>`; else svgContent += `<rect x="-15" y="-15" width="30" height="30" fill="white" stroke="black" stroke-width="2"/><line x1="-15" y1="-15" x2="15" y2="15" stroke="black" stroke-width="2"/><line x1="15" y1="-15" x2="-15" y2="15" stroke="black" stroke-width="2"/>`; svgContent += `<text x="20" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`; }
-                    if(obj.type === 'icon_load') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`; if(obj.subType === 'TBA') svgContent += `<circle cx="0" cy="0" r="18" fill="white" stroke="black" stroke-width="2"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" stroke-width="2"/>`; else svgContent += `<rect x="-18" y="-25" width="36" height="50" fill="white" stroke="black" stroke-width="2"/>`; svgContent += `<text x="25" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`; }
-                    if(obj.type === 'icon_ground') { const dx = obj.direction === 'left' ? -20 : 20; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><line x1="${dx}" y1="-20" x2="0" y2="0" stroke="black" stroke-width="2"/><circle cx="${dx}" cy="-20" r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" stroke-width="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" stroke-width="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" stroke-width="2"/></g>`; }
-                    if(obj.type === 'icon_ground_lv') { const barX = obj.direction === 'left' ? -10 : 10; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><circle cx="0" cy="0" r="2" fill="black"/><line x1="0" y1="0" x2="${barX}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-8}" y1="10" x2="${barX+8}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-5}" y1="13" x2="${barX+5}" y2="13" stroke="black" stroke-width="1.5"/><line x1="${barX-2}" y1="16" x2="${barX+2}" y2="16" stroke="black" stroke-width="1.5"/></g>`; }
-                    if(obj.type === 'rect_pvlv') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><rect width="${obj.width}" height="${obj.height}" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5"/><text x="5" y="15" fill="#ef4444" font-size="10" font-weight="bold">PVLV</text></g>`; }
+                    if(obj.type === 'text') svgContent += `<text x="${obj.x}" y="${obj.y}" font-family="Times New Roman" font-size="${obj.fontSize}" transform="rotate(${obj.rotate||0}, ${obj.x}, ${obj.y})">${obj.text}</text>`; // Đổi font sang Times cho đẹp
+                    if(obj.type === 'icon_device') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`; if(['FCO', 'LBFCO'].includes(obj.subType)) svgContent += `<line x1="-20" y1="-20" x2="20" y2="20" stroke="black" stroke-width="2"/><path d="M -20 -20 A 18 18 0 0 1 0 0" fill="none" stroke="black" stroke-width="2"/><path d="M 0 0 A 18 18 0 0 0 20 20" fill="${obj.subType==='LBFCO'?'black':'none'}" stroke="black" stroke-width="2"/>`;
+                    else svgContent += `<rect x="-15" y="-15" width="30" height="30" fill="white" stroke="black" stroke-width="2"/><line x1="-15" y1="-15" x2="15" y2="15" stroke="black" stroke-width="2"/><line x1="15" y1="-15" x2="-15" y2="15" stroke="black" stroke-width="2"/>`;
+                    svgContent += `<text x="20" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`; }
+                    if(obj.type === 'icon_load') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})">`;
+                    if(obj.subType === 'TBA') svgContent += `<circle cx="0" cy="0" r="18" fill="white" stroke="black" stroke-width="2"/><polygon points="0,-18 15.58,9 -15.58,9" fill="none" stroke="black" stroke-width="2"/>`;
+                    else svgContent += `<rect x="-18" y="-25" width="36" height="50" fill="white" stroke="black" stroke-width="2"/>`; svgContent += `<text x="25" y="5" font-family="Arial" font-size="12" font-weight="bold">${obj.label}</text></g>`;
+                    }
+                    if(obj.type === 'icon_ground') { const dx = obj.direction === 'left' ? -20 : 20; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><line x1="${dx}" y1="-20" x2="0" y2="0" stroke="black" stroke-width="2"/><circle cx="${dx}" cy="-20" r="3" fill="black"/><line x1="-15" y1="0" x2="15" y2="0" stroke="black" stroke-width="2"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" stroke-width="2"/><line x1="-5" y1="8" x2="5" y2="8" stroke="black" stroke-width="2"/></g>`;
+                    }
+                    if(obj.type === 'icon_ground_lv') { const barX = obj.direction === 'left' ? -10 : 10; svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><circle cx="0" cy="0" r="2" fill="black"/><line x1="0" y1="0" x2="${barX}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-8}" y1="10" x2="${barX+8}" y2="10" stroke="black" stroke-width="1.5"/><line x1="${barX-5}" y1="13" x2="${barX+5}" y2="13" stroke="black" stroke-width="1.5"/><line x1="${barX-2}" y1="16" x2="${barX+2}" y2="16" stroke="black" stroke-width="1.5"/></g>`;
+                    }
+                    if(obj.type === 'rect_pvlv') { svgContent += `<g transform="translate(${obj.x}, ${obj.y})"><rect width="${obj.width}" height="${obj.height}" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5"/><text x="5" y="15" fill="#ef4444" font-size="10" font-weight="bold">PVLV</text></g>`;
+                    }
                 });
                 svgContent += `</svg>`;
-                const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); const img = new Image();
-                img.onload = () => { ctx.drawImage(img, 0, 0); resolve({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height }); };
+
+                // 3. VẼ LÊN CANVAS & ÁP DỤNG FILTER
+                const canvas = document.createElement('canvas'); 
+                canvas.width = width; 
+                canvas.height = height; 
+                const ctx = canvas.getContext('2d'); 
+                
+                // --- ÁP DỤNG COLOR SATURATION TẠI ĐÂY ---
+                // saturate(66%) làm màu nhạt đi. contrast(110%) để nét vẽ đậm đà hơn chút
+                ctx.filter = 'saturate(66%) contrast(110%)'; 
+                
+                const img = new Image();
+                img.onload = () => { 
+                    ctx.drawImage(img, 0, 0); 
+                    // Xuất ra PNG (hỗ trợ trong suốt)
+                    resolve({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height }); 
+                };
                 img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgContent)));
             });
         };
