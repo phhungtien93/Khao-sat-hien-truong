@@ -225,23 +225,44 @@
         
         const fetchTemplates = async () => {
             setLoadingTemplates(true);
-            let localTemplates = [];
-            try { const local = localStorage.getItem('local_diagram_templates'); if (local) localTemplates = JSON.parse(local); } catch(e) {}
+            
+            // 1. Bỏ qua việc lấy mẫu từ LocalStorage (để tránh trùng lặp)
             let cloudTemplates = [];
-            try { const { data, error } = await supabase.from('diagram_templates').select('*').order('created_at', { ascending: false }); if (!error && data) cloudTemplates = data; } catch(e) {}
-            setTemplates([...localTemplates, ...cloudTemplates]);
+            
+            // 2. Chỉ lấy từ Supabase
+            try { 
+                const { data, error } = await supabase
+                    .from('diagram_templates')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (!error && data) cloudTemplates = data; 
+            } catch(e) {
+                console.error("Lỗi tải mẫu:", e);
+            }
+
+            // 3. Cập nhật danh sách (Chỉ còn dữ liệu Cloud)
+            setTemplates(cloudTemplates);
             setLoadingTemplates(false);
         };
+
         const handleSaveTemplate = async () => {
-            const name = prompt("Nhập tên mẫu để lưu:"); if (!name) return;
+            const name = prompt("Nhập tên mẫu để lưu:");
+            if (!name) return;
+            
             const newTplData = { name: name, data: objects };
+            
             try {
-                const local = JSON.parse(localStorage.getItem('local_diagram_templates') || '[]');
-                const localTpl = { ...newTplData, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
-                local.unshift(localTpl); localStorage.setItem('local_diagram_templates', JSON.stringify(local));
-                supabase.from('diagram_templates').insert([newTplData]).then(({ error }) => { if (error) console.warn("Cloud save failed:", error.message); });
-                alert("Đã lưu mẫu thành công!"); fetchTemplates();
-            } catch (e) { alert("Lỗi lưu mẫu: " + e.message); }
+                // --- SỬA: BỎ LƯU LOCAL, CHỈ LƯU SUPABASE ---
+                const { error } = await supabase.from('diagram_templates').insert([newTplData]);
+                
+                if (error) throw error;
+
+                alert("Đã lưu mẫu thành công!"); 
+                fetchTemplates();
+            } catch (e) { 
+                alert("Lỗi lưu mẫu: " + e.message); 
+            }
         };
         const handleDeleteTemplate = async (id, e) => {
             e.stopPropagation(); if(!confirm("Bạn có chắc muốn xóa mẫu này?")) return;
