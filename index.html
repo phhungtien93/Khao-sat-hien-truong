@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 5.2</title>
+    <title>Khảo Sát Hiện Trường Ver 1.0</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -1200,8 +1200,18 @@
             muc7_thoiGianTu: "08:00", muc7_thoiGianDen: "17:00", 
             muc7_ngay: getTodayISO(),       // Mặc định ngày hiện tại
             phieu_dgrr_ngay: getTodayISO(), // Mặc định ngày hiện tại
-            ruiRo_ATLD: [{ riskId: 1, moiNguy: "Phóng điện", moTa: "Điện hạ áp giật", bac: "II", bienPhap: "Thực hiện biện pháp an toàn..." }],
-            ruiRo_VSLD: [{ riskId: null, moiNguy: "", moTa: "", bac: "", bienPhap: "" }],
+// --- CẬP NHẬT: DANH SÁCH MỐI NGUY ATLĐ MẶC ĐỊNH ---
+            ruiRo_ATLD: [
+                { riskId: "", moiNguy: "Điện giật", moTa: "Vi phạm khoảng cách an toàn với phần có điện", bac: "III", bienPhap: "- Cắt điện, thử điện, tiếp địa đầy đủ.\n- Giám sát an toàn chặt chẽ liên tục." },
+                { riskId: "", moiNguy: "Ngã từ trên cao", moTa: "Trèo trụ điện trơn trượt, sai tư thế", bac: "III", bienPhap: "- Kiểm tra guốc trèo, dây an toàn trước khi leo.\n- Sử dụng dây an toàn 2 móc đúng quy định." },
+                { riskId: "", moiNguy: "Tai nạn giao thông", moTa: "Làm việc gần hành lang đường bộ, xe cộ qua lại", bac: "II", bienPhap: "- Đặt biển báo, rào chắn từ xa.\n- Mặc áo phản quang, cử người cảnh giới." }
+            ],
+
+            // --- CẬP NHẬT: DANH SÁCH MỐI NGUY VSLĐ MẶC ĐỊNH ---
+            ruiRo_VSLD: [
+                { riskId: "", moiNguy: "Thời tiết khắc nghiệt", moTa: "Nắng nóng kéo dài gây say nắng, kiệt sức", bac: "II", bienPhap: "- Chuẩn bị đầy đủ nước uống.\n- Bố trí thời gian làm việc và nghỉ ngơi hợp lý." },
+                { riskId: "", moiNguy: "Côn trùng cắn", moTa: "Bị ong, kiến... đốt khi làm việc trên trụ", bac: "I", bienPhap: "- Quan sát kỹ trước khi leo trụ.\n- Mặc quần áo bảo hộ dài tay, mang thuốc trị côn trùng." }
+            ],
             ruiRo_ghiChu: "- Thực hiện biện pháp an toàn theo đúng trình tự trong phương án thi công đã được duyệt.\n- Sử dụng tấm lót chèn chân chống đảm bảo cứng cáp.\n- Đặt rào chắn xung quanh vị trí công tác.\n- Tuân thủ đầy đủ biện pháp an toàn khi làm việc trên cao.\n- Tránh làm việc khi thời tiết quá nóng.",
             muc9a_catDien: "", muc9b_anToan: "- Chuẩn bị trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện đúng thời gian đăng ký.", muc9c_dieuDo: "", muc9d_khac: "", soBan: "01",
             hinh_anh: [] // Mảng chứa URL ảnh
