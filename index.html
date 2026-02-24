@@ -85,7 +85,7 @@
                     <div className="space-y-4">
                         <input 
                             className="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" 
-                            placeholder="Tên đăng nhập" 
+                            placeholder="Email" 
                             value={user} 
                             onChange={e=>setUser(e.target.value)} 
                             onKeyDown={handleEnter} 
@@ -1075,7 +1075,7 @@
                     
                     <div className="flex items-center gap-2">
                         {/* Hiển thị tên user trên màn hình lớn */}
-                        <span className="text-xs font-bold text-gray-500 hidden sm:block mr-1">Hi, {currentUser}</span>
+                        <span className="text-xs font-bold text-gray-500 hidden sm:block mr-1">Xin chào, {currentUser}</span>
                         
                         {/* NÚT ĐĂNG XUẤT MỚI */}
                         <button onClick={onLogout} className="bg-gray-100 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-full transition-colors border border-gray-200 font-bold text-xs flex items-center gap-1">
@@ -1164,39 +1164,51 @@
     };
 
     const App = () => {
-
 // --- CHÈN ĐOẠN NÀY VÀO ĐẦU TIÊN TRONG App ---
         const [isAuthenticated, setIsAuthenticated] = useState(false);
         const [isCheckingAuth, setIsCheckingAuth] = useState(false);
         const [currentUser, setCurrentUser] = useState(null);
 
-        // Tự động đăng nhập nếu đã lưu phiên trước đó
+        // --- 1. KIỂM TRA PHIÊN ĐĂNG NHẬP BẢO MẬT KHI MỞ APP ---
         useEffect(() => {
-            const savedUser = localStorage.getItem('bskht_user');
-            if (savedUser) { setIsAuthenticated(true); setCurrentUser(savedUser); }
+            const checkSession = async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    setIsAuthenticated(true);
+                    setCurrentUser(session.user.email); // Lấy email làm tên hiển thị
+                }
+                setIsCheckingAuth(false);
+            };
+            checkSession();
         }, []);
 
-        // Hàm xử lý đăng nhập
+        // --- 2. HÀM ĐĂNG NHẬP MỚI (DÙNG SUPABASE AUTH) ---
         const handleLogin = async (username, password) => {
             if(!username || !password) return alert("Vui lòng nhập đủ thông tin!");
             setIsCheckingAuth(true);
             try {
-                const { data, error } = await supabase.from('app_users').select('*').eq('username', username).eq('password', password).single();
-                if (error || !data) {
-                    alert("Sai tên đăng nhập hoặc mật khẩu!");
+                // Sử dụng hàm Auth chuẩn của Supabase (username lúc này là email)
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: username,
+                    password: password,
+                });
+
+                if (error || !data.user) {
+                    alert("Sai tài khoản hoặc mật khẩu!");
                 } else {
-                    localStorage.setItem('bskht_user', data.full_name || username);
-                    setCurrentUser(data.full_name || username);
+                    setCurrentUser(data.user.email);
                     setIsAuthenticated(true);
                 }
-            } catch (e) { alert("Lỗi kết nối: " + e.message); }
+            } catch (e) { 
+                alert("Lỗi kết nối: " + e.message);
+            }
             setIsCheckingAuth(false);
         };
 
-        // Hàm đăng xuất
-        const handleLogout = () => {
+        // --- 3. HÀM ĐĂNG XUẤT MỚI ---
+        const handleLogout = async () => {
             if(confirm("Đăng xuất khỏi tài khoản?")) {
-                localStorage.removeItem('bskht_user');
+                await supabase.auth.signOut(); // Xóa phiên an toàn trên máy chủ
                 setIsAuthenticated(false);
                 setCurrentUser(null);
             }
@@ -2415,4 +2427,3 @@ const generateDiagramImage = async (data) => {
 </script>
 </body>
 </html>
-
