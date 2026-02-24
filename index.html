@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 1.0</title>
+    <title>Khảo Sát Hiện Trường Ver 5.2</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -59,7 +59,7 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2Y2pybWNhaG5kd2VucW5rZGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5NTI4NjQsImV4cCI6MjA4NDUyODg2NH0.GoacKpBBCut6yhmYUWTLeAdbsGwzJSR2AQJrON5mEvM'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-// --- COMPONENT ĐĂNG NHẬP ---
+// --- COMPONENT ĐĂNG NHẬP (ĐÃ CẬP NHẬT GIAO DIỆN) ---
     const LoginScreen = ({ onLogin, loading }) => {
         const [user, setUser] = useState("");
         const [pass, setPass] = useState("");
@@ -68,11 +68,41 @@
         return (
             <div className="fixed inset-0 bg-gray-100 flex flex-col items-center justify-center z-[9999]">
                 <div className="bg-white p-8 rounded-xl shadow-xl w-80 border">
-                    <h2 className="text-xl font-bold text-center mb-6 text-blue-800 uppercase">Đăng Nhập</h2>
+                    
+                    {/* --- PHẦN HEADER MỚI CỦA FORM ĐĂNG NHẬP --- */}
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="bg-blue-100 p-3 rounded-full text-blue-700 mb-3 shadow-inner">
+                            {/* Dùng luôn icon có sẵn của app */}
+                            <UI_Icons.NotebookPen size={32} />
+                        </div>
+                        <h2 className="text-xl font-bold text-center text-blue-800 uppercase leading-tight">
+                            Khảo Sát<br/>Hiện Trường
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-2 font-medium">Đăng nhập hệ thống</p>
+                    </div>
+                    {/* ------------------------------------------- */}
+
                     <div className="space-y-4">
-                        <input className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Tên đăng nhập" value={user} onChange={e=>setUser(e.target.value)} onKeyDown={handleEnter} />
-                        <input type="password" className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Mật khẩu" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={handleEnter} />
-                        <button onClick={() => onLogin(user, pass)} disabled={loading} className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition-colors">
+                        <input 
+                            className="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" 
+                            placeholder="Tên đăng nhập" 
+                            value={user} 
+                            onChange={e=>setUser(e.target.value)} 
+                            onKeyDown={handleEnter} 
+                        />
+                        <input 
+                            type="password" 
+                            className="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium" 
+                            placeholder="Mật khẩu" 
+                            value={pass} 
+                            onChange={e=>setPass(e.target.value)} 
+                            onKeyDown={handleEnter} 
+                        />
+                        <button 
+                            onClick={() => onLogin(user, pass)} 
+                            disabled={loading} 
+                            className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-md mt-2"
+                        >
                             {loading ? "Đang kiểm tra..." : "ĐĂNG NHẬP"}
                         </button>
                     </div>
@@ -1189,7 +1219,7 @@
 
         // --- 2. CẤU TRÚC DỮ LIỆU MẶC ĐỊNH (Quan trọng để sửa lỗi sửa 1 bị hết) ---
         const DEFAULT_FORM_DATA = {
-            donVi: "ĐỘI QUẢN LÝ ĐIỆN CHÂU PHÚ", 
+            donVi: "ĐIỆN LỰC CHÂU PHÚ", 
             ngay: new Date().getDate(), thang: new Date().getMonth() + 1, nam: new Date().getFullYear(), gioKhaoSat: "07:30",
             loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
             is_range: false, loc_poleCode_to: "", loc_subCode_to: "",
@@ -1218,10 +1248,10 @@
         };
 
         const [dbPoles, setDbPoles] = useState([]);
-        const [dbCommunes, setDbCommunes] = useState([{name: "Thạnh Mỹ Tây"}, {name: "Mỹ Đức"}]);
-        const [dbStaff, setDbStaff] = useState(["Cao Thành Tân", "Nguyễn Văn Tâm"]);
-        const [dbPositions, setDbPositions] = useState(["Chỉ huy trực tiếp", "Giám sát an toàn", "Tổ trưởng", "Kỹ thuật viên", "Công nhân", "Đội trưởng", "Đội phó"]);
-        const [dbUnits, setDbUnits] = useState(["Đội Quản lý điện Châu Phú", "Phòng Kỹ thuật an toàn"]);
+        const [dbCommunes, setDbCommunes] = useState([]);
+        const [dbStaff, setDbStaff] = useState([]);
+        const [dbPositions, setDbPositions] = useState([]);
+        const [dbUnits, setDbUnits] = useState([]);
         const [showDiagram, setShowDiagram] = useState(false);
         const [diagramData, setDiagramData] = useState([]);
         const [riskLibrary, setRiskLibrary] = useState({ risks: [], descriptions: [], measures: [] });
