@@ -51,8 +51,18 @@
 
 <script>
     window.onerror = function(msg, src, line) { 
-        if(msg.includes("ResizeObserver")) return;
-        document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px"><h2>Lỗi hệ thống!</h2><p>' + msg + '</p><p>Dòng: ' + line + '</p></div>'; 
+    if(msg.includes("ResizeObserver")) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:20px;color:red;font-size:16px';
+    div.innerHTML = '<h2>Lỗi hệ thống!</h2>';
+    const p1 = document.createElement('p');
+    p1.textContent = msg;        // textContent không parse HTML
+    const p2 = document.createElement('p');
+    p2.textContent = 'Dòng: ' + line;
+    div.appendChild(p1);
+    div.appendChild(p2);
+    document.body.innerHTML = '';
+    document.body.appendChild(div);
     };
 </script>
 
