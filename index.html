@@ -1892,7 +1892,11 @@
         const handleSigFileChange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (!file.type.startsWith("image/")) return showMsg("Chỉ chấp nhận file hình ảnh!", "error");
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) return showMsg("Chỉ chấp nhận file JPG, PNG, WEBP!", "error");
+            const allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!allowedExts.includes(ext)) return showMsg("Phần mở rộng file không hợp lệ!", "error");
             if (file.size > 2 * 1024 * 1024) return showMsg("File quá lớn! Tối đa 2MB.", "error");
             setSigFile(file);
             setSigPreview(URL.createObjectURL(file));
@@ -3311,16 +3315,30 @@ const generateDiagramImage = async (data) => {
 
         // --- XỬ LÝ ẢNH (Upload lên Supabase) ---
         const handleImageUpload = async (e) => {
-            const files = Array.from(e.target.files);
+            const allFiles = Array.from(e.target.files);
+            if (allFiles.length === 0) return;
+
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+            const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic'];
+            const files = allFiles.filter(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (!allowedTypes.includes(file.type) || !allowedExts.includes(ext)) {
+                    alert(`File "${file.name}" không hợp lệ! Chỉ chấp nhận JPG, PNG, WEBP, HEIC.`);
+                    return false;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    alert(`File "${file.name}" quá lớn! Tối đa 5MB.`);
+                    return false;
+                }
+                return true;
+            });
             if (files.length === 0) return;
 
-            // KIỂM TRA BUCKET TRƯỚC KHI UPLOAD
-            // Lưu ý: Người dùng phải tạo bucket 'survey_images' public trong Supabase Dashboard
             const bucketName = 'survey_images';
             
             // Upload từng ảnh
             const uploadPromises = files.map(async (file) => {
-                const fileExt = file.name.split('.').pop();
+                const fileExt = file.name.split('.').pop().toLowerCase();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                 const filePath = `${fileName}`;
 
