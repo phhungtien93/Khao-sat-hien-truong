@@ -63,7 +63,7 @@
     div.appendChild(p2);
     document.body.innerHTML = '';
     document.body.appendChild(div);
-    };
+  };
 </script>
 
 <script type="text/babel">
@@ -3384,35 +3384,35 @@ const generateDiagramImage = async (data) => {
             }));
         };
 
-// --- HÀM XÓA ẢNH (ĐÃ SỬA: XÓA CẢ TRÊN CLOUD) ---
+        // --- HÀM XÓA ẢNH (ĐÃ SỬA: XÓA CẢ TRÊN CLOUD) ---
         const removeImage = async (index) => {
             const urlToDelete = formData.hinh_anh[index];
             
             // 1. Xác nhận trước khi xóa (tránh bấm nhầm)
             if(!confirm("Bạn chắc chắn muốn xóa ảnh này?")) return;
 
-            // 2. Xóa khỏi giao diện ngay lập tức
+            // 2. Xóa file trên Supabase Storage TRƯỚC
+            if (urlToDelete) {
+                try {
+                    const bucketName = 'survey_images';
+                    const parts = urlToDelete.split(`${bucketName}/`);
+                    if (parts.length > 1) {
+                        const filePath = parts.pop();
+                        const { error } = await supabase.storage.from(bucketName).remove([filePath]);
+                        if (error) throw error;
+                    }
+                } catch (err) {
+                    console.error("Lỗi xóa file cloud:", err);
+                    alert("Xóa ảnh trên cloud thất bại! Vui lòng thử lại.");
+                    return; // Dừng lại, không xóa trên UI
+                }
+            }
+
+            // 3. Xóa khỏi giao diện SAU KHI cloud thành công
             const newImages = [...(formData.hinh_anh || [])];
             newImages.splice(index, 1);
             setFormData({ ...formData, hinh_anh: newImages });
 
-            // 3. Xóa file trên Supabase Storage (Chạy ngầm)
-            if (urlToDelete) {
-                try {
-                    // URL thường có dạng: .../public/survey_images/filename.jpg
-                    // Ta cần lấy phần: filename.jpg
-                    const bucketName = 'survey_images';
-                    const parts = urlToDelete.split(`${bucketName}/`);
-                    
-                    if (parts.length > 1) {
-                        const filePath = parts.pop(); // Lấy phần cuối cùng
-                        await supabase.storage.from(bucketName).remove([filePath]);
-                        console.log("Đã xóa file trên cloud:", filePath);
-                    }
-                } catch (err) {
-                    console.error("Lỗi xóa file cloud:", err);
-                }
-            }
         };
 
         const handleRiskTypeChange = (listKey, index, e) => {
