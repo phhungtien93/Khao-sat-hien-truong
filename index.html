@@ -2469,7 +2469,7 @@
         // --- 2. CẤU TRÚC DỮ LIỆU MẶC ĐỊNH (Quan trọng để sửa lỗi sửa 1 bị hết) ---
         const DEFAULT_FORM_DATA = {
             donVi: "ĐIỆN LỰC CHÂU PHÚ", 
-            ngay: new Date().getDate(), thang: new Date().getMonth() + 1, nam: new Date().getFullYear(), gioKhaoSat: "07:30",
+            ngay: getTodayVN().ngay, thang: getTodayVN().thang, nam: getTodayVN().nam, gioKhaoSat: "07:30",
             loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
             is_range: false, loc_poleCode_to: "", loc_subCode_to: "",
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
