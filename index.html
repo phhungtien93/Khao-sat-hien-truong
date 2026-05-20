@@ -72,6 +72,20 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indxb3BybHRmZXJ6b3hrbHBjZGprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MzEzMzcsImV4cCI6MjA5MzUwNzMzN30.-xVYiV-B1RPX79NbWKfFAwPiur_zaAj1T0P8ZTSCank'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
+    const formatVNDateTime = (iso) => {
+        if (!iso) return '';
+        return new Date(iso).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit', minute: '2-digit',
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+    };
+
+    const getTodayVN = () => {
+        const parts = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).split('-');
+        return { ngay: parseInt(parts[2]), thang: parseInt(parts[1]), nam: parseInt(parts[0]) };
+    };
+
     const UI_Icons = {
         NotebookPen: ({size=18}) => (
             <svg 
@@ -101,7 +115,7 @@
         FolderOpen: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>,
         CheckSquare: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>,
         Download: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
-        Database: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s 9-1.34 9-3V5"></path></svg>,
+        Database: ({size=18}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>,
         Minus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
         Zap: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
         ZapFill: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
@@ -1416,7 +1430,9 @@
         const [email, setEmail] = useState("");
         const [password, setPassword] = useState("");
         const [hoTen, setHoTen] = useState("");
-        const [role, setRole] = useState("user"); // Mặc định là user
+        const [chucVu, setChucVu] = useState("");
+        const [donVi, setDonVi] = useState("");
+        const [role, setRole] = useState("user");
         const [loading, setLoading] = useState(false);
 
         if (!isOpen) return null;
@@ -1429,7 +1445,6 @@
                 return alert("Mật khẩu phải có ít nhất 6 ký tự!");
             }
 
-            // Lưu session admin trước khi signUp chiếm session
             const { data: sessionData } = await supabase.auth.getSession();
             const adminSession = sessionData?.session;
 
@@ -1440,15 +1455,17 @@
                     email: email,
                     password: password,
                     options: {
-                        data: { ho_ten: hoTen, role: role }
+                        data: { 
+                            ho_ten: hoTen, 
+                            role: role,
+                            chuc_vu: chucVu,
+                            don_vi: donVi
+                        }
                     }
                 });
                 if (error) throw error;
 
-                // Đăng xuất tài khoản mới tạo, giữ nguyên session admin
                 await supabase.auth.signOut();
-
-                // Đăng nhập lại bằng session của admin
                 await supabase.auth.setSession({
                     access_token: adminSession.access_token,
                     refresh_token: adminSession.refresh_token
@@ -1458,6 +1475,8 @@
                 setHoTen("");
                 setEmail("");
                 setPassword("");
+                setChucVu("");
+                setDonVi("");
                 setRole("user");
                 onClose();
             } catch (error) {
@@ -1482,44 +1501,33 @@
                     <div className="p-6 space-y-4">
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Họ và Tên *</label>
-                            <input 
-                                type="text"
-                                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" 
-                                placeholder="Nhập tên nhân viên..."
-                                value={hoTen}
-                                onChange={e => setHoTen(e.target.value)}
-                            />
+                            <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" placeholder="Nhập tên nhân viên..." value={hoTen} onChange={e => setHoTen(e.target.value)} />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Chức vụ</label>
+                                <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" placeholder="Nhân viên, KSV..." value={chucVu} onChange={e => setChucVu(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Đơn vị</label>
+                                <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" placeholder="Điện lực Châu Phú..." value={donVi} onChange={e => setDonVi(e.target.value)} />
+                            </div>
                         </div>
                         
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Email đăng nhập *</label>
-                            <input 
-                                type="email"
-                                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" 
-                                placeholder="nguyenvana@gmail.com"
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                            />
+                            <input type="email" className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" placeholder="nguyenvana@gmail.com" value={email} onChange={e => setEmail(e.target.value)} />
                         </div>
                         
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Mật khẩu *</label>
-                            <input 
-                                type="password"
-                                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" 
-                                placeholder="Ít nhất 6 ký tự"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                            />
+                            <input type="password" className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 font-medium" placeholder="Ít nhất 6 ký tự" value={password} onChange={e => setPassword(e.target.value)} />
                         </div>
 
                         <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Phân quyền *</label>
-                            <select 
-                                className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 font-bold text-blue-800 bg-gray-50"
-                                value={role}
-                                onChange={e => setRole(e.target.value)}
-                            >
+                            <select className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-500 font-bold text-blue-800 bg-gray-50" value={role} onChange={e => setRole(e.target.value)}>
                                 <option value="user">Nhân viên (User)</option>
                                 <option value="admin">Quản trị viên (Admin)</option>
                             </select>
@@ -1599,6 +1607,11 @@
                                             <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                                                 <UI_Icons.FileText size={12}/> {acc.email || "Email không xác định"}
                                             </div>
+                                            {(acc.chuc_vu || acc.don_vi) && (
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                    {[acc.chuc_vu, acc.don_vi].filter(Boolean).join(' · ')}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-2 md:pt-0">
                                             <span className="text-sm font-bold text-gray-700">Quyền:</span>
@@ -1625,138 +1638,15 @@
         );
     };
 
-    // --- COMPONENT TRANG CHỜ KÝ ---
-    const PendingSignPage = ({ isOpen, onClose, currentUserId, currentUser }) => {
-        const [pendingList, setPendingList] = useState([]);
-        const [loading, setLoading] = useState(false);
-        const [signing, setSigning] = useState(null); // bien_ban_id đang ký
+    // --- COMPONENT KÝ OTP (TÁCH RIÊNG ĐỂ TÁI SỬ DỤNG) ---
+    const OtpSignModal = ({ isOpen, signatureRequest, currentUserId, onClose, onSuccess }) => {
         const [otpInput, setOtpInput] = useState("");
         const [verifying, setVerifying] = useState(false);
-        const [message, setMessage] = useState({ text: "", type: "" });
+        const [errorMsg, setErrorMsg] = useState("");
 
         useEffect(() => {
-            if (isOpen && currentUserId) fetchPending();
-        }, [isOpen, currentUserId]);
-
-        // Realtime: cập nhật khi có thay đổi
-        useEffect(() => {
-            if (!isOpen || !currentUserId) return;
-            const channel = supabase
-                .channel('pending-sign-' + currentUserId)
-                .on('postgres_changes', {
-                    event: '*', schema: 'public', table: 'signature_requests',
-                    filter: `user_id=eq.${currentUserId}`
-                }, () => fetchPending())
-                .subscribe();
-            return () => supabase.removeChannel(channel);
-        }, [isOpen, currentUserId]);
-
-        const fetchPending = async () => {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('signature_requests')
-                .select(`
-                    id, bien_ban_id, vai_tro, thu_tu, trang_thai, created_at,
-                    bien_ban_khao_sat (ma_tru, ten_tuyen, ngay_thuc_hien)
-                `)
-                .eq('user_id', currentUserId)
-                .eq('trang_thai', 'cho_ky')
-                .order('created_at', { ascending: false });
-            if (!error && data) setPendingList(data);
-            setLoading(false);
-        };
-
-        const showMsg = (text, type = "success") => {
-            setMessage({ text, type });
-            setTimeout(() => setMessage({ text: "", type: "" }), 3500);
-        };
-
-        const computeTOTP = async (secret, counterOffset = 0) => {
-            const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret) });
-            const token = totp.generate();
-            // Dùng validate để check cả window
-            return token;
-        };
-
-        const handleSign = async (request) => {
-            setSigning(request);
-            setOtpInput("");
-        };
-
-        const handleConfirmSign = async () => {
-            if (otpInput.length !== 6) return showMsg("Nhập đủ 6 chữ số!", "error");
-            setVerifying(true);
-            try {
-                // Lấy totp_secret và chu_ky_url của user
-                const { data: profile } = await supabase
-                    .rpc('get_my_totp_secret')
-                    .single();
-
-                // get_my_totp_secret trả về text, cần lấy từ profiles trực tiếp
-                const { data: myProfile } = await supabase
-                    .from('profiles')
-                    .select('totp_secret, totp_enabled, chu_ky_url, ho_ten, email')
-                    .eq('id', currentUserId)
-                    .maybeSingle();
-
-                if (!myProfile?.totp_enabled) {
-                    showMsg("Bạn chưa kích hoạt xác thực 2 lớp! Vào Hồ Sơ để bật.", "error");
-                    setVerifying(false);
-                    return;
-                }
-                if (!myProfile?.chu_ky_url) {
-                    showMsg("Bạn chưa upload chữ ký! Vào Hồ Sơ để thêm.", "error");
-                    setVerifying(false);
-                    return;
-                }
-
-                // Verify TOTP
-                const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(myProfile.totp_secret) });
-                const delta = totp.validate({ token: otpInput, window: 3 });
-                if (delta === null) {
-                    showMsg("Mã OTP không đúng! Thử lại.", "error");
-                    setVerifying(false);
-                    return;
-                }
-
-                // Kiểm tra mã OTP đã được dùng chưa (chống replay attack)
-                const tokenHash = currentUserId + "_" + otpInput + "_" + Math.floor(Date.now() / 30000);
-                const { data: usedToken } = await supabase
-                    .from('used_otp_tokens')
-                    .select('id')
-                    .eq('user_id', currentUserId)
-                    .eq('token_hash', tokenHash)
-                    .maybeSingle();
-                if (usedToken) {
-                    showMsg("Mã OTP này đã được sử dụng! Vui lòng chờ mã mới.", "error");
-                    setVerifying(false);
-                    return;
-                }
-                // Ghi nhận mã OTP đã dùng
-                await supabase.from('used_otp_tokens').insert({ user_id: currentUserId, token_hash: tokenHash });
-
-                // Cập nhật signature_request
-                const { error } = await supabase
-                    .from('signature_requests')
-                    .update({
-                        trang_thai: 'da_ky',
-                        thoi_gian_ky: new Date().toISOString()
-                    })
-                    .eq('id', signing.id)
-                    .eq('user_id', currentUserId);
-
-                if (error) throw error;
-
-                showMsg("Ký biên bản thành công!");
-                setSigning(null);
-                setOtpInput("");
-                fetchPending();
-            } catch (e) {
-                showMsg("Lỗi: " + e.message, "error");
-            } finally {
-                setVerifying(false);
-            }
-        };
+            if (isOpen) { setOtpInput(""); setErrorMsg(""); }
+        }, [isOpen]);
 
         const vaiTroLabel = (vt) => ({
             dvct: "Đơn vị công tác",
@@ -1764,107 +1654,191 @@
             lien_quan: "Đơn vị liên quan"
         }[vt] || vt);
 
-        const formatDateTime = (iso) => {
-            if (!iso) return "";
-            const d = new Date(iso);
-            return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} ngày ${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+        const handleConfirm = async () => {
+            if (otpInput.length !== 6) { setErrorMsg("Nhập đủ 6 chữ số!"); return; }
+            setVerifying(true); setErrorMsg("");
+            try {
+                // Lấy profile của user hiện tại (RLS cho phép đọc dòng của chính mình)
+                const { data: myProfile } = await supabase
+                    .from('profiles')
+                    .select('chu_ky_url, ho_ten, email')
+                    .eq('id', currentUserId)
+                    .maybeSingle();
+
+                const { data: myTotp } = await supabase
+                    .from('user_totp')
+                    .select('totp_secret, totp_enabled')
+                    .eq('user_id', currentUserId)
+                    .maybeSingle();
+
+                if (!myTotp?.totp_enabled) {
+                    setErrorMsg("Bạn chưa kích hoạt xác thực 2 lớp! Vào Hồ Sơ để bật.");
+                    setVerifying(false); return;
+                }
+                if (!myProfile?.chu_ky_url) {
+                    setErrorMsg("Bạn chưa upload chữ ký! Vào Hồ Sơ để thêm.");
+                    setVerifying(false); return;
+                }
+
+                // Verify TOTP
+                const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(myTotp.totp_secret) });
+                const delta = totp.validate({ token: otpInput, window: 3 });
+                if (delta === null) {
+                    setErrorMsg("Mã OTP không đúng! Thử lại."); setVerifying(false); return;
+                }
+
+                // Chống replay
+                const tokenHash = currentUserId + "_" + otpInput + "_" + Math.floor(Date.now() / 30000);
+                const { data: usedToken } = await supabase
+                    .from('used_otp_tokens').select('id')
+                    .eq('user_id', currentUserId).eq('token_hash', tokenHash)
+                    .maybeSingle();
+                if (usedToken) {
+                    setErrorMsg("Mã OTP này đã được sử dụng! Vui lòng chờ mã mới.");
+                    setVerifying(false); return;
+                }
+                await supabase.from('used_otp_tokens').insert({ user_id: currentUserId, token_hash: tokenHash });
+
+                // Cập nhật signature_request
+                const signedAt = new Date().toISOString();
+                const { error } = await supabase.from('signature_requests')
+                    .update({ trang_thai: 'da_ky', thoi_gian_ky: signedAt })
+                    .eq('id', signatureRequest.id).eq('user_id', currentUserId);
+                if (error) throw error;
+
+                // Báo cho parent biết đã ký xong, kèm thông tin để hiển thị popup xác nhận
+                onSuccess({
+                    bien_ban: signatureRequest.bien_ban_khao_sat,
+                    bien_ban_id: signatureRequest.bien_ban_id,
+                    vai_tro: signatureRequest.vai_tro,
+                    vai_tro_label: vaiTroLabel(signatureRequest.vai_tro),
+                    thoi_gian_ky: signedAt,
+                    ho_ten: myProfile.ho_ten
+                });
+            } catch (e) {
+                setErrorMsg("Lỗi: " + e.message);
+            } finally {
+                setVerifying(false);
+            }
         };
 
-        if (!isOpen) return null;
+        if (!isOpen || !signatureRequest) return null;
 
         return (
-            <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 animate-zoom-in" onClick={onClose}>
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-
-                    {/* HEADER */}
-                    <div className="p-4 bg-red-700 text-white flex justify-between items-center shrink-0">
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                            <UI_Icons.Edit size={20}/> Biên Bản Chờ Ký
-                            {pendingList.length > 0 && (
-                                <span className="bg-yellow-400 text-red-900 text-xs font-bold px-2 py-0.5 rounded-full">{pendingList.length}</span>
-                            )}
-                        </h3>
-                        <button onClick={onClose} className="hover:bg-red-800 p-1 rounded-full transition-colors"><UI_Icons.X size={20}/></button>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[20000] animate-zoom-in">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+                    <h4 className="font-bold text-gray-800 text-center text-base">Xác Nhận Ký Biên Bản</h4>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-center border">
+                        <div className="font-bold text-gray-700">{signatureRequest.bien_ban_khao_sat?.ma_tru || "Biên bản #" + signatureRequest.bien_ban_id}</div>
+                        <div className="text-gray-500 text-xs mt-1">Vai trò: {vaiTroLabel(signatureRequest.vai_tro)}</div>
                     </div>
-
-                    <div className="overflow-y-auto flex-1 p-4 space-y-3">
-                        {message.text && (
-                            <div className={`p-3 rounded-lg text-sm font-bold text-center ${message.type === 'error' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
-                                {message.text}
-                            </div>
-                        )}
-
-                        {loading ? (
-                            <div className="text-center py-10 text-gray-400">Đang tải...</div>
-                        ) : pendingList.length === 0 ? (
-                            <div className="text-center py-12 text-gray-400">
-                                <UI_Icons.CheckSquare size={40} className="mx-auto mb-3 text-green-400"/>
-                                <div className="font-bold text-green-600">Không có biên bản nào chờ ký!</div>
-                            </div>
-                        ) : (
-                            pendingList.map(req => (
-                                <div key={req.id} className="border rounded-lg overflow-hidden shadow-sm">
-                                    <div className="bg-gray-50 p-3 border-b">
-                                        <div className="font-bold text-gray-800 text-sm">{req.bien_ban_khao_sat?.ma_tru || "Biên bản #" + req.bien_ban_id}</div>
-                                        <div className="text-xs text-gray-500 mt-0.5">{req.bien_ban_khao_sat?.ten_tuyen}</div>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{vaiTroLabel(req.vai_tro)}</span>
-                                            <span className="text-xs text-gray-400">{formatDateTime(req.created_at)}</span>
-                                        </div>
-                                    </div>
-                                    <div className="p-3">
-                                        <button
-                                            onClick={() => handleSign(req)}
-                                            className="w-full bg-red-600 text-white font-bold py-2 rounded-lg hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <UI_Icons.Edit size={16}/> Ký Biên Bản Này
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* MODAL XÁC NHẬN KÝ - OTP */}
-                    {signing && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[20000]">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-4">
-                                <h4 className="font-bold text-gray-800 text-center text-base">Xác Nhận Ký Biên Bản</h4>
-                                <div className="bg-gray-50 rounded-lg p-3 text-sm text-center border">
-                                    <div className="font-bold text-gray-700">{signing.bien_ban_khao_sat?.ma_tru}</div>
-                                    <div className="text-gray-500 text-xs mt-1">Vai trò: {vaiTroLabel(signing.vai_tro)}</div>
-                                </div>
-                                <div className="text-sm text-gray-600 text-center">Nhập mã 6 số từ <b>Google Authenticator</b> để xác nhận:</div>
-                                <input
-                                    type="number"
-                                    className="w-full border-2 border-red-300 rounded-lg p-3 text-center text-2xl font-bold tracking-widest outline-none focus:border-red-500"
-                                    placeholder="000000"
-                                    value={otpInput}
-                                    onChange={e => setOtpInput(e.target.value.slice(0, 6))}
-                                    onKeyDown={e => e.key === 'Enter' && handleConfirmSign()}
-                                    autoFocus
-                                />
-                                <div className="flex gap-2">
-                                    <button onClick={() => { setSigning(null); setOtpInput(""); }} className="flex-1 py-2 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Hủy</button>
-                                    <button
-                                        onClick={handleConfirmSign}
-                                        disabled={verifying || otpInput.length !== 6}
-                                        className="flex-1 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {verifying ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Đang xác minh...</> : "Xác Nhận Ký"}
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="text-sm text-gray-600 text-center">Nhập mã 6 số từ <b>Google Authenticator</b> để xác nhận:</div>
+                    <input
+                        type="number"
+                        className="w-full border-2 border-red-300 rounded-lg p-3 text-center text-2xl font-bold tracking-widest outline-none focus:border-red-500"
+                        placeholder="000000"
+                        value={otpInput}
+                        onChange={e => setOtpInput(e.target.value.slice(0, 6))}
+                        onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+                        autoFocus
+                    />
+                    {errorMsg && (
+                        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 text-center font-bold">
+                            {errorMsg}
                         </div>
                     )}
-
-                    <div className="p-4 border-t bg-gray-50 flex justify-end shrink-0">
-                        <button onClick={onClose} className="px-6 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors">Đóng</button>
+                    <div className="flex gap-2">
+                        <button onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Hủy</button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={verifying || otpInput.length !== 6}
+                            className="flex-1 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {verifying ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Đang xác minh...</> : "Xác Nhận Ký"}
+                        </button>
                     </div>
                 </div>
             </div>
         );
     };
+
+// --- POPUP XÁC NHẬN ĐÃ KÝ THÀNH CÔNG ---
+    const SignedSuccessModal = ({ isOpen, signedInfo, onClose, onViewReport }) => {
+        if (!isOpen || !signedInfo) return null;
+
+        const bb = signedInfo.bien_ban || {};
+        const ngayThucHien = bb.ngay_thuc_hien 
+            ? bb.ngay_thuc_hien.split('-').reverse().join('/') 
+            : "---";
+        const thoiGianKy = formatVNDateTime(signedInfo.thoi_gian_ky);
+
+        return (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[20001] animate-zoom-in">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+                    {/* HEADER xanh lá - thành công */}
+                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 text-center text-white">
+                        <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
+                            <UI_Icons.CheckSquare size={36}/>
+                        </div>
+                        <h3 className="font-bold text-xl">Ký Biên Bản Thành Công!</h3>
+                        <p className="text-green-100 text-sm mt-1">Chữ ký điện tử của bạn đã được ghi nhận</p>
+                    </div>
+
+                    {/* THÔNG TIN CHI TIẾT */}
+                    <div className="p-5 space-y-3 bg-gray-50">
+                        <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2 shadow-sm">
+                            <div className="flex items-start gap-2">
+                                <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Người ký:</div>
+                                <div className="text-sm font-bold text-blue-800 flex-1">{signedInfo.ho_ten}</div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Vai trò:</div>
+                                <div className="text-sm font-medium text-gray-800 flex-1">
+                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">{signedInfo.vai_tro_label}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Biên bản:</div>
+                                <div className="text-sm font-bold text-gray-800 flex-1">{bb.ma_tru || "---"}</div>
+                            </div>
+                            {bb.ten_tuyen && (
+                                <div className="flex items-start gap-2">
+                                    <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Công việc:</div>
+                                    <div className="text-sm text-gray-700 flex-1 line-clamp-2">{bb.ten_tuyen}</div>
+                                </div>
+                            )}
+                            <div className="flex items-start gap-2">
+                                <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Ngày T.Hiện:</div>
+                                <div className="text-sm font-medium text-gray-800 flex-1">{ngayThucHien}</div>
+                            </div>
+                            <div className="flex items-start gap-2 border-t border-gray-100 pt-2 mt-2">
+                                <div className="text-xs font-bold text-gray-500 uppercase w-24 shrink-0 pt-0.5">Ký lúc:</div>
+                                <div className="text-sm font-bold text-green-700 flex-1">{thoiGianKy}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* FOOTER - 2 nút */}
+                    <div className="p-4 bg-white border-t flex gap-2">
+                        <button 
+                            onClick={onClose} 
+                            className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
+                        >
+                            Đóng
+                        </button>
+                        <button 
+                            onClick={() => { onClose(); onViewReport(signedInfo.bien_ban_id); }} 
+                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md"
+                        >
+                            <UI_Icons.FileText size={16}/> Xem Lại Biên Bản
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+// (Đã xóa PendingSignPage cũ - tab Chờ Ký nay là filter trên danh sách chính, logic ký đã chuyển sang OtpSignModal)
 
     // --- COMPONENT TRANG HỒ SƠ CÁ NHÂN ---
     const ProfilePage = ({ isOpen, onClose, currentUserId, currentUser }) => {
@@ -1885,12 +1859,22 @@
 
         const fetchProfile = async () => {
             setLoading(true);
-            const { data, error } = await supabase
+            const { data: profileData } = await supabase
                 .from('profiles')
-                .select('ho_ten, email, chu_ky_url, totp_enabled')
+                .select('ho_ten, email, chuc_vu, don_vi, chu_ky_url')
                 .eq('id', currentUserId)
                 .maybeSingle();
-            if (!error && data) setProfile(data);
+
+            const { data: totpData } = await supabase
+                .from('user_totp')
+                .select('totp_enabled')
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            if (profileData) setProfile({ 
+                ...profileData, 
+                totp_enabled: totpData?.totp_enabled || false 
+            });
             setLoading(false);
         };
 
@@ -1966,9 +1950,12 @@
                 const delta = totp.validate({ token: otpInput, window: 3 });
                 if (delta === null) { showMsg("Mã OTP không đúng! Thử lại.", "error"); setVerifying(false); return; }
                 const { error } = await supabase
-                    .from('profiles')
-                    .update({ totp_secret: totpSecret, totp_enabled: true })
-                    .eq('id', currentUserId);
+                    .from('user_totp')
+                    .upsert({ 
+                        user_id: currentUserId, 
+                        totp_secret: totpSecret, 
+                        totp_enabled: true 
+                    }, { onConflict: 'user_id' });
                 if (error) throw error;
                 setTotpStep("idle");
                 showMsg("Kích hoạt xác thực 2 lớp thành công!");
@@ -1983,9 +1970,12 @@
         const handleDisableTOTP = async () => {
             if (!confirm("Bạn chắc chắn muốn tắt xác thực 2 lớp?")) return;
             const { error } = await supabase
-                .from('profiles')
-                .update({ totp_secret: null, totp_enabled: false })
-                .eq('id', currentUserId);
+                .from('user_totp')
+                .upsert({ 
+                    user_id: currentUserId, 
+                    totp_secret: null, 
+                    totp_enabled: false 
+                }, { onConflict: 'user_id' });
             if (!error) { showMsg("Đã tắt xác thực 2 lớp."); fetchProfile(); }
         };
 
@@ -2008,9 +1998,41 @@
                             </div>
                         )}
                         {loading ? <div className="text-center py-10 text-gray-400">Đang tải...</div> : (<>
-                            <div className="bg-gray-50 rounded-lg p-4 border">
+                            <div className="bg-gray-50 rounded-lg p-4 border space-y-2">
                                 <div className="font-bold text-gray-800 text-base">{profile?.ho_ten || "Chưa cập nhật"}</div>
-                                <div className="text-sm text-gray-500 mt-1">{currentUser}</div>
+                                <div className="text-sm text-gray-500">{currentUser}</div>
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-500 mb-1">Chức vụ</div>
+                                        <input
+                                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-blue-500 font-medium"
+                                            value={profile?.chuc_vu || ""}
+                                            onChange={e => setProfile({...profile, chuc_vu: e.target.value})}
+                                            placeholder="Nhập chức vụ..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-gray-500 mb-1">Đơn vị</div>
+                                        <input
+                                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-blue-500 font-medium"
+                                            value={profile?.don_vi || ""}
+                                            onChange={e => setProfile({...profile, don_vi: e.target.value})}
+                                            placeholder="Nhập đơn vị..."
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        const { error } = await supabase.from('profiles')
+                                            .update({ chuc_vu: profile.chuc_vu, don_vi: profile.don_vi })
+                                            .eq('id', currentUserId);
+                                        if (error) showMsg("Lỗi cập nhật: " + error.message, "error");
+                                        else showMsg("Đã cập nhật thông tin!");
+                                    }}
+                                    className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 active:scale-95 transition-all text-sm"
+                                >
+                                    Lưu Thông Tin
+                                </button>
                             </div>
 
                             {/* CHỮ KÝ */}
@@ -2119,7 +2141,7 @@
     };
 
 // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (ĐÃ CẬP NHẬT NÚT ĐĂNG XUẤT) ---
-    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom, onLogout, onOpenCreateAccount, onOpenAccountManager, onOpenProfile, onOpenPendingSign, pendingCount, currentUser, currentUserId, currentUserRole }) => {
+    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom, onLogout, onOpenCreateAccount, onOpenAccountManager, onOpenProfile, onSign, onCopy, pendingCount, currentUser, currentUserId, currentUserRole, dbProfiles }) => {
         const [activeMainTab, setActiveMainTab] = useState("bienban");
         const [reports, setReports] = useState([]);
         const [loading, setLoading] = useState(false);
@@ -2128,6 +2150,7 @@
         const [filterMaDinhDanh, setFilterMaDinhDanh] = useState("");
         const [downloadedIds, setDownloadedIds] = useState([]);
         const [previewImages, setPreviewImages] = useState(null);
+        const [visibleCount, setVisibleCount] = useState(25);
 
         useEffect(() => {
             const updateDownloadedStatus = () => {
@@ -2145,12 +2168,25 @@
             return () => { document.body.style.overflow = ''; window.removeEventListener('storage', updateDownloadedStatus); }
         }, [isOpen]);
 
+        // Realtime: khi có signature_requests thay đổi → tải lại để cập nhật tab Chờ Ký
+        useEffect(() => {
+            if (!isOpen || !currentUserId) return;
+            const channel = supabase
+                .channel('reportlist-sigreq-' + currentUserId)
+                .on('postgres_changes', {
+                    event: '*', schema: 'public', table: 'signature_requests',
+                    filter: `user_id=eq.${currentUserId}`
+                }, () => fetchReports())
+                .subscribe();
+            return () => supabase.removeChannel(channel);
+        }, [isOpen, currentUserId]);
+
         const fetchReports = async (searchCode = filterCode, searchDate = filterDate, searchMa = filterMaDinhDanh) => {
             setLoading(true);
             try {
                 let query = supabase
                     .from('bien_ban_khao_sat')
-                    .select('*, signature_requests(user_id, trang_thai)')
+                    .select('*, signature_requests(id, user_id, vai_tro, thu_tu, trang_thai)')
                     .order('ngay_thuc_hien', { ascending: false, nullsFirst: false }) 
                     .order('created_at', { ascending: false });
                 if (searchCode && searchCode.trim()) query = query.ilike('ma_tru', `%${searchCode.trim()}%`);
@@ -2166,7 +2202,16 @@
             } catch (error) { alert("Lỗi tải danh sách: " + error.message); } finally { setLoading(false); }
         };
 
-        const handleClearFilters = () => { setFilterCode(""); setFilterDate(""); setFilterMaDinhDanh(""); fetchReports("", "", ""); };
+        // Lọc danh sách theo tab đang active
+        const visibleReports = activeMainTab === "choky"
+            ? reports.filter(r => (r.signature_requests || []).some(
+                sr => sr.user_id === currentUserId && sr.trang_thai === 'cho_ky'
+              ))
+            : activeMainTab === "cuatoi"
+            ? reports.filter(r => r.user_id === currentUserId)
+            : reports;
+
+        const handleClearFilters = () => { setFilterCode(""); setFilterDate(""); setFilterMaDinhDanh(""); setVisibleCount(25); fetchReports("", "", ""); };
         
         // --- HÀM XÓA BIÊN BẢN (ĐÃ NÂNG CẤP XÓA SẠCH ẢNH TRÊN CLOUD) ---
         const handleDelete = async (report, e) => {
@@ -2216,16 +2261,7 @@
             }
         };
         
-        const formatDateTime = (isoString) => {
-            if (!isoString) return "";
-            const date = new Date(isoString);
-            const d = date.getDate().toString().padStart(2, '0');
-            const m = (date.getMonth() + 1).toString().padStart(2, '0');
-            const y = date.getFullYear();
-            const h = date.getHours().toString().padStart(2, '0');
-            const min = date.getMinutes().toString().padStart(2, '0');
-            return `${d}/${m}/${y} - ${h}:${min}`;
-        };
+        const formatDateTime = (isoString) => formatVNDateTime(isoString);
 
         if (!isOpen) return null;
 
@@ -2275,35 +2311,113 @@
                 {/* FILTER BAR (Đã tối ưu Mobile: Tách 2 dòng khi màn hình nhỏ) */}
                 <div className="bg-white p-2 md:p-3 border-b shrink-0 z-10 shadow-sm">
                     <div className="max-w-4xl mx-auto flex flex-col gap-2">
+                        {/* --- TAB BAR (NEW): Biên Bản / Chờ Ký --- */}
+                        <div className="flex bg-gray-100 p-1 rounded-lg shadow-inner border border-gray-200 gap-1">
+                            <button
+                                onClick={() => { setActiveMainTab("bienban"); setVisibleCount(25); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs md:text-sm font-bold transition-all ${
+                                    activeMainTab === "bienban"
+                                        ? "bg-blue-600 text-white shadow-md ring-1 ring-blue-700"
+                                        : "bg-transparent text-gray-500 hover:bg-white hover:text-blue-700"
+                                }`}
+                            >
+                                <UI_Icons.NotebookPen size={16}/>
+                                <span>Biên Bản</span>
+                            </button>
+                            <button
+                                onClick={() => { setActiveMainTab("cuatoi"); setVisibleCount(25); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs md:text-sm font-bold transition-all ${
+                                    activeMainTab === "cuatoi"
+                                        ? "bg-green-600 text-white shadow-md ring-1 ring-green-700"
+                                        : "bg-transparent text-gray-500 hover:bg-white hover:text-green-700"
+                                }`}
+                            >
+                                <UI_Icons.User size={16}/>
+                                <span>Của Tôi</span>
+                            </button>
+                            <button
+                                onClick={() => { setActiveMainTab("choky"); setVisibleCount(25); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs md:text-sm font-bold transition-all relative ${
+                                    activeMainTab === "choky"
+                                        ? "bg-red-600 text-white shadow-md ring-1 ring-red-700"
+                                        : "bg-transparent text-gray-500 hover:bg-white hover:text-red-600"
+                                }`}
+                            >
+                                <UI_Icons.Edit size={16}/>
+                                <span>Chờ Ký</span>
+                                {pendingCount > 0 && (
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5 ${
+                                        activeMainTab === "choky"
+                                            ? "bg-yellow-400 text-red-900"
+                                            : "bg-red-500 text-white"
+                                    }`}>
+                                        {pendingCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
                         <div className="flex gap-2">
                             <div className="flex-1 relative">
-                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-bold text-gray-700 text-sm shadow-inner transition-colors" placeholder="Tìm theo mã trụ hoặc tên tuyến..." value={filterCode} onChange={(e) => setFilterCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchReports()} />
+                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-bold text-gray-700 text-sm shadow-inner transition-colors" placeholder="Tìm theo mã trụ hoặc tên tuyến..." value={filterCode} onChange={(e) => { setFilterCode(e.target.value); fetchReports(e.target.value, filterDate, filterMaDinhDanh); }} />
                                 <div className="absolute left-2.5 top-2.5 text-gray-400"><UI_Icons.ZoomIn size={16}/></div>
                             </div>
                             <div className="relative w-44">
-                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-mono text-gray-700 text-sm shadow-inner transition-colors" placeholder="Mã định danh..." value={filterMaDinhDanh} onChange={(e) => setFilterMaDinhDanh(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchReports()} />
+                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-mono text-gray-700 text-sm shadow-inner transition-colors" placeholder="Mã định danh..." value={filterMaDinhDanh} onChange={(e) => { setFilterMaDinhDanh(e.target.value); fetchReports(filterCode, filterDate, e.target.value); }} />
                                 <div className="absolute left-2.5 top-2.5 text-gray-400"><UI_Icons.Hash size={16}/></div>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <input type="date" className="flex-1 md:flex-none border border-gray-300 rounded-lg px-2 py-2 outline-none font-medium text-sm md:w-36 shadow-inner" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
-                            <button onClick={() => fetchReports()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow active:scale-95 transition-transform text-sm shrink-0">Tìm</button>
-                            {(filterDate || filterCode || filterMaDinhDanh) && (<button onClick={handleClearFilters} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-3 rounded-lg active:scale-95 transition-transform shrink-0" title="Hủy lọc"><UI_Icons.RotateCcw size={16}/></button>)}
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="date"
+                                className="flex-none border border-gray-300 rounded-lg px-2 py-2 outline-none font-medium text-sm w-36 shadow-inner"
+                                value={filterDate}
+                                onChange={(e) => { setFilterDate(e.target.value); fetchReports(filterCode, e.target.value, filterMaDinhDanh); }}
+                            />
+                            <button
+                                onClick={handleClearFilters}
+                                className="bg-gray-200 hover:bg-red-100 hover:text-red-600 text-gray-600 font-bold py-2 px-3 rounded-lg active:scale-95 transition-all shrink-0 flex items-center gap-1.5 border border-gray-300"
+                                title="Xóa bộ lọc"
+                            >
+                                <UI_Icons.RotateCcw size={16}/> <span className="hidden md:inline text-sm">Reset</span>
+                            </button>
+
+                            {/* LEGEND MÀU SẮC TRẠNG THÁI KÝ */}
+                            <div className="hidden sm:flex items-center gap-2 ml-auto flex-wrap">
+                                <span className="flex items-center gap-1 text-xs text-gray-500">
+                                    <span className="inline-block w-8 h-5 rounded bg-gray-200 border border-gray-300"></span>
+                                    Chưa ký
+                                </span>
+                                <span className="flex items-center gap-1 text-xs text-gray-500">
+                                    <span className="inline-block w-8 h-5 rounded bg-orange-200 border border-orange-300"></span>
+                                    Ký một phần
+                                </span>
+                                <span className="flex items-center gap-1 text-xs text-gray-500">
+                                    <span className="inline-block w-8 h-5 rounded bg-green-200 border border-green-300"></span>
+                                    Đã ký đủ
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* DANH SÁCH */}
                 <div className="flex-1 overflow-y-auto bg-gray-100 p-2">
-                    <div className="max-w-4xl mx-auto pb-20">
+                    <div className="max-w-4xl mx-auto pb-4">
                         {loading ? (
                             <div className="text-center py-8 text-gray-500 text-sm flex flex-col items-center gap-2"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div> Đang tải...</div>
-                        ) : reports.length === 0 ? (
-                            <div className="text-center py-10 bg-white rounded border border-gray-200 text-gray-400 italic text-sm">Chưa có biên bản nào. Bấm "Tạo Mới" để bắt đầu.</div>
+                        ) : visibleReports.length === 0 ? (
+                            <div className="text-center py-10 bg-white rounded border border-gray-200 text-gray-400 italic text-sm">
+                                {activeMainTab === "choky" 
+                                    ? "🎉 Không có biên bản nào đang chờ bạn ký!"
+                                    : activeMainTab === "cuatoi"
+                                    ? "Bạn chưa tạo biên bản nào."
+                                    : "Chưa có biên bản nào. Bấm \"Tạo Mới\" để bắt đầu."}
+                            </div>
                         ) : (
                             <div className="bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
                                 <div className="divide-y divide-gray-100">
-                                    {reports.map(r => {
+                                    {visibleReports.slice(0, visibleCount).map(r => {
                                         const isDownloaded = downloadedIds.includes(r.id);
                                         const btnClass = isDownloaded ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-green-700 hover:border-green-300";
                                         const imgCount = r.du_lieu_form?.hinh_anh ? r.du_lieu_form.hinh_anh.length : 0;
@@ -2318,6 +2432,29 @@
 
                                         // Được sửa nếu: là chủ sở hữu VÀ chưa có ai khác ký
                                         const canEdit = isOwner && !othersSigned;
+
+                                        // Tìm signature_request CỦA USER HIỆN TẠI đang chờ ký (nếu có)
+                                        const myPendingSig = (r.signature_requests || []).find(
+                                            sr => sr.user_id === currentUserId && sr.trang_thai === 'cho_ky'
+                                        );
+
+                                        // --- TRẠNG THÁI KÝ CỦA BIÊN BẢN (để tô màu badge ngày) ---
+                                        const allSigs = r.signature_requests || [];
+                                        const totalSigs = allSigs.length;
+                                        const signedSigs = allSigs.filter(sr => sr.trang_thai === 'da_ky').length;
+                                        
+                                        let dateBadgeClass = "bg-gray-200 text-gray-700"; // Mặc định: chưa ai ký
+                                        let dateBadgeTitle = totalSigs === 0 ? "Không yêu cầu ký" : "Chưa có chữ ký nào";
+                                        
+                                        if (totalSigs > 0 && signedSigs > 0 && signedSigs < totalSigs) {
+                                            // Đã ký một phần
+                                            dateBadgeClass = "bg-orange-200 text-orange-800 border border-orange-300";
+                                            dateBadgeTitle = `Đã ký ${signedSigs}/${totalSigs} - Còn chờ ${totalSigs - signedSigs} người`;
+                                        } else if (totalSigs > 0 && signedSigs === totalSigs) {
+                                            // Đã ký đủ
+                                            dateBadgeClass = "bg-green-200 text-green-800 border border-green-300";
+                                            dateBadgeTitle = `Đã ký đủ ${signedSigs}/${totalSigs}`;
+                                        }
                                         
                                         return (
                                             <div key={r.id} className="px-3 py-3 hover:bg-blue-50 transition-colors group cursor-default">
@@ -2328,13 +2465,12 @@
                                                         <div className="font-bold text-blue-800 text-[15px] leading-tight mb-1.5 line-clamp-2 md:truncate" title={r.ma_tru}>
                                                             {r.ma_tru || "---"}
                                                         </div>
-                                                        {r.ma_dinh_danh && (
-                                                            <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-                                                                {r.ma_dinh_danh}
-                                                            </div>
-                                                        )}
+
                                                         <div className="flex items-center text-xs md:text-sm text-gray-600 gap-2">
-                                                            <span className="font-bold text-gray-700 whitespace-nowrap shrink-0 bg-gray-200 px-1.5 py-0.5 rounded">
+                                                            <span 
+                                                                className={`font-bold whitespace-nowrap shrink-0 px-1.5 py-0.5 rounded ${dateBadgeClass}`}
+                                                                title={dateBadgeTitle}
+                                                            >
                                                                 {r.ngay_thuc_hien 
                                                                     ? r.ngay_thuc_hien.split('-').reverse().join('/') 
                                                                     : formatDateTime(r.created_at)}
@@ -2347,20 +2483,70 @@
                                                     </div>
                                                     
                                                     {/* Phần Nút Bấm */}
-                                                    <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 border-t border-gray-100 md:border-t-0 pt-2 md:pt-0 mt-1 md:mt-0">
+                                                    <div className="flex flex-col items-end justify-between gap-1 shrink-0 border-t border-gray-100 md:border-t-0 pt-2 md:pt-0 mt-1 md:mt-0">
+                                                        <div className="flex items-center justify-end gap-2">
+
                                                         {imgCount > 0 ? (
                                                             <button onClick={() => setPreviewImages(r.du_lieu_form.hinh_anh)} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm" title="Xem ảnh hiện trường"><UI_Icons.Image size={14}/> {imgCount} Ảnh</button>
                                                         ) : (
                                                             <span className="flex items-center gap-1.5 px-1 py-1.5 text-gray-400 text-xs italic"><UI_Icons.Image size={14}/> 0 Ảnh</span>
                                                         )}
                                                         <div className="flex items-center gap-1.5">
-                                                            {canEdit && (
+                                                            {/* NÚT XEM + KÝ - chỉ hiện ở TAB "CHỜ KÝ" (khi user có yêu cầu chờ ký) */}
+                                                            {activeMainTab === "choky" && myPendingSig && (
+                                                                <>
+                                                                    <button onClick={() => onLoad(r.id, true)} className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-300 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm" title="Xem biên bản trước khi ký">
+                                                                        <UI_Icons.FileText size={14}/> Xem
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => onSign({ 
+                                                                            ...myPendingSig, 
+                                                                            bien_ban_id: r.id, 
+                                                                            bien_ban_khao_sat: { ma_tru: r.ma_tru, ten_tuyen: r.ten_tuyen, ngay_thuc_hien: r.ngay_thuc_hien } 
+                                                                        })} 
+                                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-md"
+                                                                    >
+                                                                        <UI_Icons.Edit size={14}/> Ký
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            {/* NÚT COPY - hiện ở TAB "BIÊN BẢN" và "CỦA TÔI" */}
+                                                            {(activeMainTab === "bienban" || activeMainTab === "cuatoi") && (
+                                                                <button
+                                                                    onClick={() => onCopy(r.id)}
+                                                                    className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm"
+                                                                    title="Tạo biên bản mới từ biên bản này"
+                                                                >
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                                    Copy
+                                                                </button>
+                                                            )}
+                                                            {/* NÚT XEM - hiện ở TAB "BIÊN BẢN" khi không có quyền sửa */}
+                                                            {activeMainTab === "bienban" && !canEdit && (
+                                                                <button onClick={() => onLoad(r.id, true)} className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-300 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm">
+                                                                    <UI_Icons.FileText size={14}/> Xem
+                                                                </button>
+                                                            )}
+                                                            {/* NÚT SỬA - chỉ hiện ở TAB "BIÊN BẢN" và khi user là chủ + chưa có ai ký */}
+                                                            {activeMainTab === "bienban" && canEdit && (
                                                                 <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
                                                             )}
                                                             <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-bold active:scale-95 transition-all shadow-sm ${btnClass}`}><UI_Icons.Download size={14}/> Word</button>
-                                                            {isOwner && (
+                                                            {isOwner && activeMainTab === "bienban" && (
                                                                 <button onClick={(e) => handleDelete(r, e)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md ml-1 transition-colors active:scale-95" title="Xóa biên bản và ảnh"><UI_Icons.Trash2 size={18}/></button>
                                                             )}
+                                                        </div>
+                                                        </div>
+                                                        {/* TẠO BỞI + MÃ ĐỊNH DANH - góc dưới phải */}
+                                                        <div className="text-[10px] text-gray-400 text-right leading-tight space-y-0.5">
+                                                            {r.ma_dinh_danh && (
+                                                                <div className="font-mono text-gray-500 font-bold">{r.ma_dinh_danh}</div>
+                                                            )}
+                                                            <div>
+                                                                Tạo bởi: <span className="font-bold text-gray-500">{dbProfiles.find(p => p.id === r.user_id)?.ho_ten || "---"}</span>
+                                                                <span className="mx-1">·</span>
+                                                                {r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' }) : "---"}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     
@@ -2369,29 +2555,21 @@
                                         );
                                     })}
                                 </div>
+                                {/* NÚT XEM THÊM */}
+                                {visibleReports.length > visibleCount && (
+                                    <div className="p-3 border-t border-gray-100 text-center bg-gray-50">
+                                        <button
+                                            onClick={() => setVisibleCount(prev => prev + 25)}
+                                            className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-2 w-full py-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                            <UI_Icons.Plus size={16}/>
+                                            Xem thêm ({visibleReports.length - visibleCount} biên bản còn lại)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                </div>
-            {/* BOTTOM TAB BAR */}
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30 flex h-14">
-                    <button
-                        onClick={() => setActiveMainTab("bienban")}
-                        className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-colors ${activeMainTab === "bienban" ? "text-blue-600" : "text-gray-400"}`}
-                    >
-                        <UI_Icons.NotebookPen size={20}/>
-                        Biên Bản
-                    </button>
-                    <button
-                        onClick={() => { setActiveMainTab("choky"); onOpenPendingSign(); }}
-                        className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-colors relative ${activeMainTab === "choky" ? "text-red-600" : "text-gray-400"}`}
-                    >
-                        <UI_Icons.Edit size={20}/>
-                        Chờ Ký
-                        {pendingCount > 0 && (
-                            <span className="absolute top-1 right-1/4 bg-yellow-400 text-red-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingCount}</span>
-                        )}
-                    </button>
                 </div>
             </div>
         );
@@ -2483,7 +2661,7 @@
         // --- 2. CẤU TRÚC DỮ LIỆU MẶC ĐỊNH (Quan trọng để sửa lỗi sửa 1 bị hết) ---
         const DEFAULT_FORM_DATA = {
             donVi: "ĐIỆN LỰC CHÂU PHÚ", 
-            ngay: new Date().getDate(), thang: new Date().getMonth() + 1, nam: new Date().getFullYear(), gioKhaoSat: "07:30",
+            ngay: getTodayVN().ngay, thang: getTodayVN().thang, nam: getTodayVN().nam, gioKhaoSat: "07:30",
             loc_poleCode: "", loc_subCode: "", loc_lineName: "", loc_commune: "", 
             is_range: false, loc_poleCode_to: "", loc_subCode_to: "",
             dvct_daiDien1: "", dvct_chucVu1: "", dvct_daiDien2: "", dvct_chucVu2: "",
@@ -2520,8 +2698,10 @@
         const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
         const [showAccountManagerModal, setShowAccountManagerModal] = useState(false);
         const [showProfileModal, setShowProfileModal] = useState(false);
-        const [showPendingSign, setShowPendingSign] = useState(false);
         const [pendingCount, setPendingCount] = useState(0);
+        const [isReadOnly, setIsReadOnly] = useState(false);
+        const [signingRequest, setSigningRequest] = useState(null);
+        const [signedInfo, setSignedInfo] = useState(null);
 
         // Đếm biên bản chờ ký của user hiện tại
         useEffect(() => {
@@ -2568,7 +2748,7 @@
             // 3. Tải Profiles (để chọn người ký)
             const { data: profilesData } = await supabase
                 .from('profiles')
-                .select('id, ho_ten, chuc_vu, don_vi, totp_enabled, chu_ky_url')
+                .select('id, ho_ten, chuc_vu, don_vi, email, chu_ky_url, role')
                 .order('ho_ten', { ascending: true });
             if (profilesData) setDbProfiles(profilesData);
 
@@ -2809,11 +2989,22 @@ const generateDiagramImage = async (data) => {
             if (bienBanId) {
                 const { data: sigData } = await supabase
                     .from('signature_requests')
-                    .select('user_id, vai_tro, thu_tu, trang_thai, thoi_gian_ky, profiles(ho_ten, email, chu_ky_url)')
+                    .select('user_id, vai_tro, thu_tu, trang_thai, thoi_gian_ky')
                     .eq('bien_ban_id', bienBanId)
                     .eq('trang_thai', 'da_ky');
-                if (sigData) {
-                    sigData.forEach(s => { sigMap[s.user_id] = s; });
+
+                if (sigData && sigData.length > 0) {
+                    const signerIds = sigData.map(s => s.user_id);
+                    const { data: signerProfiles } = await supabase
+                        .from('profiles')
+                        .select('id, ho_ten, email, chu_ky_url')
+                        .in('id', signerIds);
+                    sigData.forEach(s => {
+                        sigMap[s.user_id] = {
+                            ...s,
+                            profiles: signerProfiles?.find(p => p.id === s.user_id) || {}
+                        };
+                    });
                 }
             }
 
@@ -2825,8 +3016,7 @@ const generateDiagramImage = async (data) => {
 
             const formatDTWord = (iso) => {
                 if (!iso) return "";
-                const d = new Date(iso);
-                return `Ký lúc ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} ngày ${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+                return `Ký lúc ${formatVNDateTime(iso)}`;
             };
 
             // 3. TẠO FILE WORD
@@ -3174,12 +3364,25 @@ const generateDiagramImage = async (data) => {
 
         const fetchSignatureStatus = async (bienBanId) => {
             if (!bienBanId) return;
-            const { data } = await supabase
+            const { data: sigRows } = await supabase
                 .from('signature_requests')
-                .select('id, user_id, vai_tro, thu_tu, trang_thai, thoi_gian_ky, profiles(ho_ten, email, chu_ky_url)')
+                .select('id, user_id, vai_tro, thu_tu, trang_thai, thoi_gian_ky')
                 .eq('bien_ban_id', bienBanId)
                 .order('vai_tro')
                 .order('thu_tu');
+
+            let data = sigRows || [];
+            if (data.length > 0) {
+                const ids = data.map(s => s.user_id);
+                const { data: profs } = await supabase
+                    .from('profiles')
+                    .select('id, ho_ten, email, chu_ky_url')
+                    .in('id', ids);
+                data = data.map(s => ({
+                    ...s,
+                    profiles: (profs || []).find(p => p.id === s.user_id) || {}
+                }));
+            }
             if (data) setSignatureStatus(data);
         };
 
@@ -3256,21 +3459,18 @@ const generateDiagramImage = async (data) => {
                 let bienBanId = currentReportId || newlyInsertedId;
 
                 if (bienBanId) {
-                    // Lấy danh sách người đã ký rồi (không được xóa hoặc tạo lại)
-                    const { data: alreadySigned } = await supabase
+                    // 1. Lấy danh sách signer ĐÃ KÝ - tuyệt đối không động đến
+                    const { data: signedReqs } = await supabase
                         .from('signature_requests')
-                        .select('user_id')
+                        .select('user_id, vai_tro, thu_tu')
                         .eq('bien_ban_id', bienBanId)
                         .eq('trang_thai', 'da_ky');
-                    const signedUserIds = (alreadySigned || []).map(s => s.user_id);
+                    const signed = signedReqs || [];
+                    const keyOf = (s) => `${s.user_id}|${s.vai_tro}|${s.thu_tu}`;
+                    const signedKeys = new Set(signed.map(keyOf));
 
-                    // Chỉ xóa các request CHO_KY — không đụng vào DA_KY
-                    await supabase.from('signature_requests').delete()
-                        .eq('bien_ban_id', bienBanId)
-                        .eq('trang_thai', 'cho_ky');
-
-                    // Gom danh sách người cần ký
-                    const signers = [
+                    // 2. Gom danh sách signer mới từ form
+                    const formSigners = [
                         formData.dvct_userId1 && { user_id: formData.dvct_userId1, vai_tro: 'dvct', thu_tu: 1 },
                         formData.dvct_userId2 && { user_id: formData.dvct_userId2, vai_tro: 'dvct', thu_tu: 2 },
                         formData.qlvh_userId1 && { user_id: formData.qlvh_userId1, vai_tro: 'qlvh', thu_tu: 1 },
@@ -3278,27 +3478,37 @@ const generateDiagramImage = async (data) => {
                         formData.qlvh_userId3 && { user_id: formData.qlvh_userId3, vai_tro: 'qlvh', thu_tu: 3 },
                     ].filter(Boolean);
 
-                    // Chỉ tạo request cho những người CHƯA ký
-                    const toInsert = signers.filter(s => !signedUserIds.includes(s.user_id));
+                    // 3. XÓA TOÀN BỘ cho_ky cũ (RLS đã cho phép sau khi thêm sig_delete_by_owner)
+                    await supabase.from('signature_requests')
+                        .delete()
+                        .eq('bien_ban_id', bienBanId)
+                        .eq('trang_thai', 'cho_ky');
 
-                    if (toInsert.length > 0) {
-                        const inserts = toInsert.map(s => ({
+                    // 4. INSERT lại cho_ky mới, bỏ qua người đã ký
+                    const toInsert = formSigners
+                        .filter(s => !signedKeys.has(keyOf(s)))
+                        .map(s => ({
                             bien_ban_id: bienBanId,
                             user_id: s.user_id,
                             vai_tro: s.vai_tro,
                             thu_tu: s.thu_tu,
                             trang_thai: 'cho_ky'
                         }));
-                        await supabase.from('signature_requests').insert(inserts);
+
+                    if (toInsert.length > 0) {
+                        const { error: insertErr } = await supabase
+                            .from('signature_requests').insert(toInsert);
+                        if (insertErr) console.error("Lỗi tạo signature_requests:", insertErr);
                     }
                 }
 
                 alert("Đã lưu thành công!");
+                setIsReadOnly(false);
                 setShowReportList(true);
             }
         };
 
-        const handleLoadReport = async (id) => {
+        const handleLoadReport = async (id, readOnly = false) => {
             const { data, error } = await supabase.from('bien_ban_khao_sat').select('*').eq('id', id).single();
             if (error) { alert("Lỗi tải biên bản: " + error.message); } 
             else if (data) {
@@ -3313,14 +3523,60 @@ const generateDiagramImage = async (data) => {
                 setDiagramData(data.du_lieu_so_do || []); 
                 setCurrentReportId(data.id);
                 setCurrentMaDinhDanh(data.ma_dinh_danh || "");
+                setIsReadOnly(readOnly);
                 setShowReportList(false);
             }
+        };
+
+        const handleCopyReport = async (id) => {
+            const { data, error } = await supabase.from('bien_ban_khao_sat').select('*').eq('id', id).single();
+            if (error) { alert("Lỗi tải biên bản: " + error.message); return; }
+            if (!data) return;
+
+            const savedForm = data.du_lieu_form || {};
+
+            // Giữ nguyên nội dung, reset những thứ cần điền lại
+            setFormData({
+                ...DEFAULT_FORM_DATA,
+                ...savedForm,
+                // Reset vị trí trụ + tuyến — người dùng tự điền lại
+                loc_poleCode: "",
+                loc_subCode: "",
+                loc_poleCode_to: "",
+                loc_subCode_to: "",
+                loc_lineName: "",
+                loc_commune: "",
+                // Reset Mục 4 địa điểm
+                muc4_diaDiem: "Tại",
+                // Reset Mục 6 phạm vi
+                muc6_phamVi: "",
+                // Reset ngày về hôm nay
+                ngay: getTodayVN().ngay,
+                thang: getTodayVN().thang,
+                nam: getTodayVN().nam,
+                muc7_ngay: getTodayISO(),
+                phieu_dgrr_ngay: getTodayISO(),
+                // Reset ảnh — ảnh cũ thuộc biên bản gốc
+                hinh_anh: [],
+            });
+
+            // Giữ sơ đồ nếu có (thường sơ đồ cũng giống nhau)
+            setDiagramData(data.du_lieu_so_do || []);
+
+            // Reset các trường liên quan đến biên bản mới
+            setCurrentReportId(null);
+            setCurrentMaDinhDanh("");
+            setIsReadOnly(false);
+            setSignatureStatus([]);
+            setShowReportList(false);
         };
 
         const handleCreateNew = () => {
             // Reset sạch sẽ về mặc định
             setFormData({ ...DEFAULT_FORM_DATA, phieu_dgrr_ngay: getTodayISO(), muc7_ngay: getTodayISO() });
-            setDiagramData([]); setCurrentReportId(null); setCurrentMaDinhDanh(""); setShowReportList(false);
+            setDiagramData([]); setCurrentReportId(null); setCurrentMaDinhDanh(""); 
+            setIsReadOnly(false);
+            setShowReportList(false);
         };
 
         // --- XỬ LÝ ẢNH (Upload lên Supabase) ---
@@ -3478,17 +3734,28 @@ const generateDiagramImage = async (data) => {
                 
                 {/* Modal Tạo Tài Khoản */}
                 <CreateAccountModal isOpen={showCreateAccountModal} onClose={() => setShowCreateAccountModal(false)} />
-                  <ProfilePage
-                isOpen={showProfileModal}
-                onClose={() => setShowProfileModal(false)}
-                currentUserId={currentUserId}
-                currentUser={currentUser}
-                />
-                <PendingSignPage
-                    isOpen={showPendingSign}
-                    onClose={() => setShowPendingSign(false)}
+                <ProfilePage
+                    isOpen={showProfileModal}
+                    onClose={() => setShowProfileModal(false)}
                     currentUserId={currentUserId}
                     currentUser={currentUser}
+                />
+
+                {/* Modal nhập OTP để ký */}
+                <OtpSignModal
+                    isOpen={!!signingRequest}
+                    signatureRequest={signingRequest}
+                    currentUserId={currentUserId}
+                    onClose={() => setSigningRequest(null)}
+                    onSuccess={(info) => { setSigningRequest(null); setSignedInfo(info); }}
+                />
+
+                {/* Modal xác nhận sau khi ký thành công */}
+                <SignedSuccessModal
+                    isOpen={!!signedInfo}
+                    signedInfo={signedInfo}
+                    onClose={() => setSignedInfo(null)}
+                    onViewReport={(id) => { setSignedInfo(null); handleLoadReport(id, true); }}
                 />
                 
                 {/* Modal Quản Lý Tài Khoản */}
@@ -3505,11 +3772,13 @@ const generateDiagramImage = async (data) => {
                     onOpenCreateAccount={() => setShowCreateAccountModal(true)}
                     onOpenAccountManager={() => setShowAccountManagerModal(true)}
                     onOpenProfile={() => setShowProfileModal(true)}
-                    onOpenPendingSign={() => setShowPendingSign(true)}
+                    onSign={(sigReq) => setSigningRequest(sigReq)}
+                    onCopy={handleCopyReport}
                     pendingCount={pendingCount}
                     currentUser={currentUser}
                     currentUserId={currentUserId}
                     currentUserRole={currentUserRole}
+                    dbProfiles={dbProfiles}
                 />
                 <RiskManagerModal isOpen={showRiskManager} onClose={() => setShowRiskManager(false)} onRefresh={refreshAllBackgroundData} existingRisks={riskLibrary.risks} />
 
@@ -3520,43 +3789,106 @@ const generateDiagramImage = async (data) => {
                     onRefresh={refreshAllBackgroundData} 
                 />
 
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                    <div className="text-xs text-gray-500 font-medium">{currentReportId ? <span className="text-blue-600 font-bold">Đang sửa: {formData.loc_poleCode}</span> : "Đang tạo mới"}</div>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={async () => { 
-                                if(confirm("Dữ liệu chưa lưu sẽ mất. Bạn chắc chắn muốn thoát?")) {
-                                    // NẾU ĐANG TẠO MỚI (Chưa có ID) -> Xóa sạch ảnh vừa up để tránh rác
-                                    if (!currentReportId && formData.hinh_anh.length > 0) {
-                                        const bucketName = 'survey_images';
-                                        const pathsToDelete = formData.hinh_anh.map(url => url.split(`${bucketName}/`).pop());
-                                        await supabase.storage.from(bucketName).remove(pathsToDelete);
-                                        console.log("Đã dọn dẹp ảnh rác do hủy tạo mới");
-                                    }
-                                    setShowReportList(true); 
-                                }
-                            }} 
-                            className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm"
-                        >
-                            Hủy/Thoát
-                        </button>
-
-                        {/* --- NÚT QUẢN LÝ MẪU MỚI --- */}
-                        <button 
-                            onClick={() => setShowTemplateManager(true)} 
-                            className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-200 border border-purple-300" 
-                            title="Chỉnh sửa list Nội dung & Phạm vi"
-                        >
-                            <UI_Icons.Edit size={18}/> <span className="hidden md:inline">List Mẫu</span>
-                        </button>
-
-                        <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
-                        <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
-                        <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
+                {/* FOOTER - CHẾ ĐỘ CHỈ ĐỌC (Xem để ký) */}
+                {isReadOnly ? (
+                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                        <div className="text-xs text-gray-500 font-medium">
+                            <span className="text-amber-600 font-bold flex items-center gap-1">
+                                <UI_Icons.FileText size={14}/> Đang xem: {formData.loc_poleCode || "---"}
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => { setIsReadOnly(false); setShowReportList(true); }} 
+                                className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm"
+                            >
+                                <UI_Icons.X size={16}/> Đóng
+                            </button>
+                            <button 
+                                onClick={() => handleExportDocx(null)} 
+                                className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-100 text-xs md:text-sm"
+                            >
+                                <UI_Icons.Download size={16}/> <span className="hidden md:inline">Tải Word</span>
+                            </button>
+                            {/* Nút Ký chỉ hiện nếu user còn yêu cầu chờ ký trên biên bản này */}
+                            {(() => {
+                                const myReq = signatureStatus.find(s => s.user_id === currentUserId && s.trang_thai === 'cho_ky');
+                                if (!myReq) return null;
+                                return (
+                                    <button 
+                                        onClick={() => setSigningRequest({
+                                            ...myReq,
+                                            bien_ban_id: currentReportId,
+                                            bien_ban_khao_sat: { 
+                                                ma_tru: formData.loc_poleCode, 
+                                                ten_tuyen: formData.muc5_noiDung, 
+                                                ngay_thuc_hien: formData.muc7_ngay 
+                                            }
+                                        })} 
+                                        className="bg-red-600 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-red-700 active:scale-95 transition-all shadow-md"
+                                    >
+                                        <UI_Icons.Edit size={18}/> KÝ NGAY
+                                    </button>
+                                );
+                            })()}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    /* FOOTER - CHẾ ĐỘ SỬA/TẠO MỚI (giữ nguyên như cũ) */
+                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-between items-center z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                        <div className="text-xs text-gray-500 font-medium">{currentReportId ? <span className="text-blue-600 font-bold">Đang sửa: {formData.loc_poleCode}</span> : "Đang tạo mới"}</div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={async () => { 
+                                    if(confirm("Dữ liệu chưa lưu sẽ mất. Bạn chắc chắn muốn thoát?")) {
+                                        // NẾU ĐANG TẠO MỚI (Chưa có ID) -> Xóa sạch ảnh vừa up để tránh rác
+                                        if (!currentReportId && formData.hinh_anh.length > 0) {
+                                            const bucketName = 'survey_images';
+                                            const pathsToDelete = formData.hinh_anh.map(url => url.split(`${bucketName}/`).pop());
+                                            await supabase.storage.from(bucketName).remove(pathsToDelete);
+                                            console.log("Đã dọn dẹp ảnh rác do hủy tạo mới");
+                                        }
+                                        setIsReadOnly(false);
+                                        setShowReportList(true); 
+                                    }
+                                }}
+                                className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-gray-200 border border-gray-300 text-xs md:text-sm"
+                            >
+                                Hủy/Thoát
+                            </button>
 
-                <div className="a4-paper">
+                            {/* --- NÚT QUẢN LÝ MẪU MỚI --- */}
+                            <button 
+                                onClick={() => setShowTemplateManager(true)} 
+                                className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-200 border border-purple-300" 
+                                title="Chỉnh sửa list Nội dung & Phạm vi"
+                            >
+                                <UI_Icons.Edit size={18}/> <span className="hidden md:inline">List Mẫu</span>
+                            </button>
+
+                            <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
+                            <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
+                            <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Banner cảnh báo chế độ chỉ đọc */}
+                {isReadOnly && (
+                    <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4 text-center text-sm font-bold shadow-md z-50 flex items-center justify-center gap-2">
+                        <UI_Icons.FileText size={16}/> CHẾ ĐỘ XEM (CHỈ ĐỌC) - Không thể chỉnh sửa
+                    </div>
+                )}
+
+                <div 
+                    className="a4-paper"
+                    style={isReadOnly ? { 
+                        pointerEvents: 'none', 
+                        userSelect: 'text',
+                        marginTop: '40px',
+                        opacity: 0.97
+                    } : {}}
+                >
                     <div className="flex justify-between mb-6 text-center text-sm"><div className="w-1/2"><div className="font-bold uppercase">CÔNG TY ĐIỆN LỰC AN GIANG</div><input className="input-line text-center uppercase font-bold" value={formData.donVi} onChange={e => setFormData({...formData, donVi: e.target.value})} /><hr className="w-1/3 mx-auto mt-1 border-gray-400" /></div><div className="w-1/2"><div className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div><div className="font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</div><div className="mt-2 italic">Châu Phú, ngày <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.ngay} onChange={e => setFormData({...formData, ngay: e.target.value})} /> tháng <input type="number" className="w-8 text-center border-b border-gray-300 outline-none" value={formData.thang} onChange={e => setFormData({...formData, thang: e.target.value})} /> năm <input type="number" className="w-12 text-center border-b border-gray-300 outline-none" value={formData.nam} onChange={e => setFormData({...formData, nam: e.target.value})} /></div></div></div>
                     <h1 className="text-xl font-bold text-center mb-4 uppercase">BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG</h1>
                     {currentMaDinhDanh && (
@@ -4215,11 +4547,7 @@ const generateDiagramImage = async (data) => {
 
                     {/* CHÂN BIÊN BẢN + TRẠNG THÁI CHỮ KÝ */}
                     {(() => {
-                        const formatDT = (iso) => {
-                            if (!iso) return "";
-                            const d = new Date(iso);
-                            return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} ngày ${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
-                        };
+                        const formatDT = (iso) => formatVNDateTime(iso);
                         const getSig = (userId) => signatureStatus.find(s => s.user_id === userId);
 
                         const renderSigBox = (label, name, userId) => {
