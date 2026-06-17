@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Khảo Sát Hiện Trường Ver 1.0</title>
+    <title>Khảo Sát Hiện Trường Ver 1.2.5</title>
     
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -15,6 +15,8 @@
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.2.1/otpauth.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 
     <style>
         body { font-family: 'Times New Roman', sans-serif; background-color: #f3f4f6; }
@@ -43,6 +45,10 @@
         .camera-btn:hover { background: #dbeafe; border-color: #2563eb; }
         @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .animate-zoom-in { animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideInRight { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
+        .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-exit { animation: slideOutRight 0.3s ease-in forwards; }
     </style>
 </head>
 <body>
@@ -68,6 +74,37 @@
 
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
+
+    // ===== TOAST NOTIFICATION SYSTEM =====
+    const ToastContext = React.createContext(null);
+
+    const ToastContainer = ({ toasts, removeToast }) => {
+        return (
+            <div className="fixed top-4 right-4 z-[99999] flex flex-col gap-2 pointer-events-none" style={{maxWidth: '320px'}}>
+                {toasts.map(t => (
+                    <div
+                        key={t.id}
+                        className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-bold cursor-pointer select-none ${
+                            t.type === 'success' ? 'bg-green-600 text-white border-green-700' :
+                            t.type === 'error'   ? 'bg-red-600 text-white border-red-700' :
+                            t.type === 'warning' ? 'bg-yellow-500 text-white border-yellow-600' :
+                                                   'bg-gray-800 text-white border-gray-900'
+                        } ${t.exiting ? 'toast-exit' : 'toast-enter'}`}
+                        onClick={() => removeToast(t.id)}
+                    >
+                        <span className="text-lg leading-none shrink-0">
+                            {t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : t.type === 'warning' ? '⚠' : 'ℹ'}
+                        </span>
+                        <span className="leading-snug">{t.message}</span>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const useToast = () => React.useContext(ToastContext);
+    // ===== END TOAST =====
+
     const supabaseUrl = 'https://wqoprltferzoxklpcdjk.supabase.co'
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indxb3BybHRmZXJ6b3hrbHBjZGprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MzEzMzcsImV4cCI6MjA5MzUwNzMzN30.-xVYiV-B1RPX79NbWKfFAwPiur_zaAj1T0P8ZTSCank'
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -904,7 +941,7 @@
         const [expandedRiskId, setExpandedRiskId] = useState(null); 
         
         const [name, setName] = useState("");
-        const [capDienAp, setCapDienAp] = useState(""); // STATE MỚI: "" = Chung, "TA" = Trung áp, "HA" = Hạ áp
+        const [capDienAp, setCapDienAp] = useState("");
         const [measure, setMeasure] = useState("");
         
         const [existingMeasures, setExistingMeasures] = useState([]);
@@ -975,7 +1012,7 @@
             let targetRiskId = selectedRiskId;
 
             if (mode === 'create') {
-                if (!name.trim()) { alert("Vui lòng nhập loại công việc!"); setLoading(false); return; }
+                if (!name.trim()) { alert("Vui lòng nhập tên mối nguy!"); setLoading(false); return; }
                 // ĐÃ THÊM CỘT CAP_DIEN_AP VÀO LÚC LƯU
                 const { data, error } = await supabase.from('dm_moi_nguy').insert([{ ten_moi_nguy: name.trim(), cap_dien_ap: capDienAp }]).select();
                 if (error) { alert("Lỗi lưu: " + error.message); setLoading(false); return; }
@@ -989,7 +1026,7 @@
             if (measureInserts.length > 0) await supabase.from('dm_bien_phap').insert(measureInserts);
 
             alert("Đã lưu thành công!"); onRefresh(); 
-            if(mode === 'create') { setName(""); setMeasure(""); setCapDienAp(""); }
+            if(mode === 'create') { setName(""); setMeasure(""); }
             setLoading(false);
         };
 
@@ -1127,26 +1164,18 @@
                         {mode === 'create' && (
                             <div className="space-y-3 bg-gray-50 p-3 rounded border">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Loại công việc *</label>
-                                    <input className="w-full border rounded p-2 focus:border-blue-500 outline-none" value={name} onChange={e => setName(e.target.value)} placeholder="VD: Trèo trụ, làm việc trên cao" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Cấp điện áp (Bộ lọc)</label>
-                                    <select className="w-full border rounded p-2 focus:border-blue-500 outline-none font-semibold text-blue-800" value={capDienAp} onChange={e => setCapDienAp(e.target.value)}>
-                                        <option value="">⚡ Chung (Luôn hiển thị ở mọi Tab)</option>
-                                        <option value="TA">🔴 Trung Áp (Chỉ hiện khi chọn Tab TA)</option>
-                                        <option value="HA">🔵 Hạ Áp (Chỉ hiện khi chọn Tab HA)</option>
-                                    </select>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Tên mối nguy *</label>
+                                    <input className="w-full border rounded p-2 focus:border-blue-500 outline-none" value={name} onChange={e => setName(e.target.value)} placeholder="VD: Điện áp cảm ứng, Làm việc trên cao..." />
                                 </div>
                             </div>
                         )}
 
                         {mode === 'update' && (
                             <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Chọn loại công việc cần sửa *</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Chọn mối nguy cần sửa *</label>
                                 <select className="w-full border rounded p-2 font-bold text-blue-800 outline-none" value={selectedRiskId} onChange={e => setSelectedRiskId(e.target.value)}>
-                                    <option value="">-- Chọn loại công việc --</option>
-                                    {existingRisks.map(r => (<option key={r.id} value={r.id}>{r.ten_moi_nguy} {r.cap_dien_ap ? `[${r.cap_dien_ap}]` : ""}</option>))}
+                                    <option value="">-- Chọn mối nguy --</option>
+                                    {existingRisks.map(r => (<option key={r.id} value={r.id}>{r.ten_moi_nguy}</option>))}
                                 </select>
                             </div>
                         )}
@@ -1154,7 +1183,7 @@
                         {mode === 'list' && (
                             <div className="space-y-6">
                                 <div>
-                                    <div className="bg-blue-100 text-blue-800 px-3 py-1.5 font-bold text-sm rounded mb-2 sticky top-0 z-10 border border-blue-200">Danh sách Loại công việc</div>
+                                    <div className="bg-blue-100 text-blue-800 px-3 py-1.5 font-bold text-sm rounded mb-2 sticky top-0 z-10 border border-blue-200">Danh sách Mối nguy</div>
                                     <div className="space-y-1">
                                         {existingRisks.length === 0 ? <div className="text-gray-400 italic text-xs ml-2">Chưa có dữ liệu</div> : existingRisks.map(r => renderRiskRow(r))}
                                     </div>
@@ -1167,10 +1196,9 @@
                                 <div className="text-sm text-gray-800">
                                     <p className="font-bold mb-2">Hướng dẫn cấu trúc file Excel (.xlsx):</p>
                                     <ul className="list-disc pl-5 space-y-1">
-                                        <li><b>Cột A:</b> Loại công việc (VD: Thay sứ)</li>
-                                        <li><b>Cột B:</b> Biện pháp an toàn</li>
-                                        <li><b>Cột C:</b> Cấp điện áp (Nhập: <b>TA</b> hoặc <b>HA</b>)</li>
-                                        <li><i>Lưu ý: Dòng 1 luôn bị bỏ qua. Hệ thống sẽ tự gộp nếu trùng tên Loại công việc.</i></li>
+                                        <li><b>Cột A:</b> Tên mối nguy (VD: Điện áp cảm ứng)</li>
+                                        <li><b>Cột B:</b> Biện pháp an toàn (1 dòng = 1 biện pháp)</li>
+                                        <li><i>Lưu ý: Dòng 1 luôn bị bỏ qua. Hệ thống sẽ tự gộp nếu trùng tên mối nguy.</i></li>
                                     </ul>
                                 </div>
                                 <div className="flex items-center justify-center w-full">
@@ -1188,7 +1216,7 @@
 
                         {(mode === 'create' || mode === 'update') && (
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Mối nguy & biện pháp kiểm soát:</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Biện pháp an toàn <span className="text-gray-400 font-normal">(mỗi dòng = 1 biện pháp)</span>:</label>
                                 {mode === 'update' && existingMeasures.length > 0 && (
                                     <div className="mb-2 space-y-2 max-h-40 overflow-y-auto border p-2 rounded bg-gray-50">
                                         {existingMeasures.map((item, i) => (
@@ -1199,7 +1227,7 @@
                                         ))}
                                     </div>
                                 )}
-                                <textarea className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-200 outline-none" rows="3" placeholder="Nhập mối nguy và biện pháp (xuống dòng để tách thành nhiều mục)..." value={measure} onChange={e => setMeasure(e.target.value)}></textarea>
+                                <textarea className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-200 outline-none" rows="4" placeholder="Mỗi dòng là 1 biện pháp an toàn&#10;VD: Cắt MC 471CD&#10;Treo biển cấm đóng điện&#10;Nối đất lưu động" value={measure} onChange={e => setMeasure(e.target.value)}></textarea>
                             </div>
                         )}
                     </div>
@@ -1283,7 +1311,7 @@
                 table = 'dm_mau_cong_viec';
                 payload = { loai: 'noi_dung', noi_dung: newForm.noi_dung.trim() };
             } else if (activeTab === 'poles') {
-                if (!newForm.code?.trim()) return alert("Vui lòng nhập Mã Trụ!");
+                if (!newForm.code?.trim()) return alert("Vui lòng nhập Số trụ!");
                 payload = { code: newForm.code.trim(), line_name: newForm.line_name?.trim() };
             } else if (activeTab === 'communes') {
                 if (!newForm.name?.trim()) return alert("Vui lòng nhập Tên Xã / Phường!");
@@ -1356,7 +1384,7 @@
                                             
 
                                             {activeTab === 'poles' && <>
-                                                <input className="border border-blue-400 rounded px-2 py-1.5 text-sm outline-none font-bold text-blue-700" placeholder="Mã trụ" value={editData.code||""} onChange={e => setEditData({...editData, code: e.target.value})} />
+                                                <input className="border border-blue-400 rounded px-2 py-1.5 text-sm outline-none font-bold text-blue-700" placeholder="Số trụ" value={editData.code||""} onChange={e => setEditData({...editData, code: e.target.value})} />
                                                 <input className="border border-blue-400 rounded px-2 py-1.5 text-sm outline-none md:col-span-2" placeholder="Tên tuyến" value={editData.line_name||""} onChange={e => setEditData({...editData, line_name: e.target.value})} />
                                             </>}
 
@@ -1409,7 +1437,7 @@
                             
 
                             {activeTab === 'poles' && <>
-                                <input className="w-full md:w-48 border border-purple-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200 shadow-inner font-bold text-blue-800" placeholder="Mã trụ (VD: 477CD/12)" value={newForm.code||""} onChange={e => setNewForm({...newForm, code: e.target.value})} />
+                                <input className="w-full md:w-48 border border-purple-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200 shadow-inner font-bold text-blue-800" placeholder="Số trụ (VD: 477CD/12)" value={newForm.code||""} onChange={e => setNewForm({...newForm, code: e.target.value})} />
                                 <input className="flex-1 border border-purple-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200 shadow-inner" placeholder="Tên tuyến (VD: 477 Cái Dầu)" value={newForm.line_name||""} onChange={e => setNewForm({...newForm, line_name: e.target.value})} onKeyDown={e => e.key === 'Enter' && handleAdd()}/>
                             </>}
 
@@ -2141,7 +2169,7 @@
     };
 
 // --- COMPONENT TRANG QUẢN LÝ BÁO CÁO (ĐÃ CẬP NHẬT NÚT ĐĂNG XUẤT) ---
-    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onZoom, onLogout, onOpenCreateAccount, onOpenAccountManager, onOpenProfile, onSign, onCopy, pendingCount, currentUser, currentUserId, currentUserRole, dbProfiles }) => {
+    const ReportListPage = ({ isOpen, onCreateNew, onLoad, onExport, onExportPdf, onZoom, onLogout, onOpenCreateAccount, onOpenAccountManager, onOpenProfile, onSign, onCopy, showToast, pendingCount, currentUser, currentUserId, currentUserRole, dbProfiles }) => {
         const [activeMainTab, setActiveMainTab] = useState("bienban");
         const [reports, setReports] = useState([]);
         const [loading, setLoading] = useState(false);
@@ -2151,6 +2179,15 @@
         const [downloadedIds, setDownloadedIds] = useState([]);
         const [previewImages, setPreviewImages] = useState(null);
         const [visibleCount, setVisibleCount] = useState(25);
+        const [filterCreator, setFilterCreator] = useState("");
+        const debounceRef = useRef(null);
+
+        const fetchReportsDebounced = (code, date, ma) => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => {
+                fetchReports(code, date, ma);
+            }, 400);
+        };
 
         useEffect(() => {
             const updateDownloadedStatus = () => {
@@ -2189,7 +2226,10 @@
                     .select('*, signature_requests(id, user_id, vai_tro, thu_tu, trang_thai)')
                     .order('ngay_thuc_hien', { ascending: false, nullsFirst: false }) 
                     .order('created_at', { ascending: false });
-                if (searchCode && searchCode.trim()) query = query.ilike('ma_tru', `%${searchCode.trim()}%`);
+                if (searchCode && searchCode.trim()) {
+                    const kw = searchCode.trim();
+                    query = query.or(`ma_tru.ilike.%${kw}%,ten_tuyen.ilike.%${kw}%`);
+                }
                 if (searchMa && searchMa.trim()) query = query.ilike('ma_dinh_danh', `%${searchMa.trim()}%`);
                 if (searchDate) {
                     const startDate = new Date(searchDate); startDate.setHours(0, 0, 0, 0);
@@ -2199,11 +2239,11 @@
                 const { data, error } = await query;
                 if (error) throw error;
                 setReports(data || []);
-            } catch (error) { alert("Lỗi tải danh sách: " + error.message); } finally { setLoading(false); }
+            } catch (error) { showToast("Lỗi tải danh sách: " + error.message, "error"); } finally { setLoading(false); }
         };
 
         // Lọc danh sách theo tab đang active
-        const visibleReports = activeMainTab === "choky"
+        const baseReports = activeMainTab === "choky"
             ? reports.filter(r => (r.signature_requests || []).some(
                 sr => sr.user_id === currentUserId && sr.trang_thai === 'cho_ky'
               ))
@@ -2211,7 +2251,14 @@
             ? reports.filter(r => r.user_id === currentUserId)
             : reports;
 
-        const handleClearFilters = () => { setFilterCode(""); setFilterDate(""); setFilterMaDinhDanh(""); setVisibleCount(25); fetchReports("", "", ""); };
+        const visibleReports = filterCreator.trim()
+            ? baseReports.filter(r => {
+                const creator = dbProfiles.find(p => p.id === r.user_id);
+                return creator?.ho_ten?.toLowerCase().includes(filterCreator.trim().toLowerCase());
+              })
+            : baseReports;
+
+        const handleClearFilters = () => { setFilterCode(""); setFilterDate(""); setFilterMaDinhDanh(""); setFilterCreator(""); setVisibleCount(25); fetchReports("", "", ""); };
         
         // --- HÀM XÓA BIÊN BẢN (ĐÃ NÂNG CẤP XÓA SẠCH ẢNH TRÊN CLOUD) ---
         const handleDelete = async (report, e) => {
@@ -2242,9 +2289,10 @@
                 const { error } = await supabase.from('bien_ban_khao_sat').delete().eq('id', report.id);
                 if (error) throw error;
                 
-                fetchReports(); // Làm mới lại danh sách
+                fetchReports();
+                showToast("Đã xóa biên bản thành công!");
             } catch (error) {
-                alert("Lỗi xóa: " + error.message);
+                showToast("Lỗi xóa: " + error.message, "error");
             } finally {
                 setLoading(false);
             }
@@ -2359,12 +2407,24 @@
 
                         <div className="flex gap-2">
                             <div className="flex-1 relative">
-                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-bold text-gray-700 text-sm shadow-inner transition-colors" placeholder="Tìm theo mã trụ hoặc tên tuyến..." value={filterCode} onChange={(e) => { setFilterCode(e.target.value); fetchReports(e.target.value, filterDate, filterMaDinhDanh); }} />
+                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-bold text-gray-700 text-sm shadow-inner transition-colors" placeholder="Tìm theo số trụ hoặc tên tuyến..." value={filterCode} onChange={(e) => { setFilterCode(e.target.value); fetchReportsDebounced(e.target.value, filterDate, filterMaDinhDanh); }} />
                                 <div className="absolute left-2.5 top-2.5 text-gray-400"><UI_Icons.ZoomIn size={16}/></div>
                             </div>
                             <div className="relative w-44">
-                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-mono text-gray-700 text-sm shadow-inner transition-colors" placeholder="Mã định danh..." value={filterMaDinhDanh} onChange={(e) => { setFilterMaDinhDanh(e.target.value); fetchReports(filterCode, filterDate, e.target.value); }} />
+                                <input type="text" className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-mono text-gray-700 text-sm shadow-inner transition-colors" placeholder="Mã định danh..." value={filterMaDinhDanh} onChange={(e) => { setFilterMaDinhDanh(e.target.value); fetchReportsDebounced(filterCode, filterDate, e.target.value); }} />
                                 <div className="absolute left-2.5 top-2.5 text-gray-400"><UI_Icons.Hash size={16}/></div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    className="w-full border border-gray-300 rounded-lg pl-8 pr-2 py-2 outline-none focus:border-blue-500 font-medium text-gray-700 text-sm shadow-inner transition-colors"
+                                    placeholder="Tìm theo người tạo..."
+                                    value={filterCreator}
+                                    onChange={(e) => { setFilterCreator(e.target.value); setVisibleCount(25); }}
+                                />
+                                <div className="absolute left-2.5 top-2.5 text-gray-400"><UI_Icons.User size={16}/></div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -2372,7 +2432,7 @@
                                 type="date"
                                 className="flex-none border border-gray-300 rounded-lg px-2 py-2 outline-none font-medium text-sm w-36 shadow-inner"
                                 value={filterDate}
-                                onChange={(e) => { setFilterDate(e.target.value); fetchReports(filterCode, e.target.value, filterMaDinhDanh); }}
+                                onChange={(e) => { setFilterDate(e.target.value); fetchReportsDebounced(filterCode, e.target.value, filterMaDinhDanh); }}
                             />
                             <button
                                 onClick={handleClearFilters}
@@ -2531,7 +2591,10 @@
                                                             {activeMainTab === "bienban" && canEdit && (
                                                                 <button onClick={() => handleEditClick(r.id)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-md text-xs font-bold active:scale-95 transition-transform shadow-sm"><UI_Icons.Edit size={14}/> Sửa</button>
                                                             )}
-                                                            <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-bold active:scale-95 transition-all shadow-sm ${btnClass}`}><UI_Icons.Download size={14}/> Word</button>
+                                                            <div className="flex rounded-md overflow-hidden shadow-sm border border-gray-300">
+                                                                <button onClick={() => handleExportClick(r)} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold active:scale-95 transition-all border-r border-gray-300 hover:bg-gray-100`} title="Tải Word"><UI_Icons.FileText size={14}/> Word</button>
+                                                                <button onClick={() => onExportPdf(r)} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold active:scale-95 transition-all text-red-600 hover:bg-red-50`} title="Tải PDF"><UI_Icons.Download size={14}/> PDF</button>
+                                                            </div>
                                                             {isOwner && activeMainTab === "bienban" && (
                                                                 <button onClick={(e) => handleDelete(r, e)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md ml-1 transition-colors active:scale-95" title="Xóa biên bản và ảnh"><UI_Icons.Trash2 size={18}/></button>
                                                             )}
@@ -2576,7 +2639,19 @@
     };
 
     const App = () => {
-// --- CHÈN ĐOẠN NÀY VÀO ĐẦU TIÊN TRONG App ---
+        // ===== TOAST STATE =====
+        const [toasts, setToasts] = useState([]);
+        const removeToast = (id) => {
+            setToasts(prev => prev.map(t => t.id === id ? {...t, exiting: true} : t));
+            setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 300);
+        };
+        const showToast = (message, type = 'success', duration = 3500) => {
+            const id = Date.now() + Math.random();
+            setToasts(prev => [...prev, { id, message, type, exiting: false }]);
+            setTimeout(() => removeToast(id), duration);
+        };
+        // ===== END TOAST STATE =====
+
         const [isAuthenticated, setIsAuthenticated] = useState(false);
         const [isCheckingAuth, setIsCheckingAuth] = useState(false);
         const [currentUser, setCurrentUser] = useState(null);
@@ -2676,9 +2751,10 @@
             // --- DỮ LIỆU BẢNG 8 MỚI ---
             muc8_bangData: [
                 { 
+                    moi_nguy_id: null,
                     congViec: "", 
                     bienPhap: "", 
-                    donViThucHien: "Tổ QLVH" 
+                    donVi: "" 
                 }
             ],
             soBan: "01",
@@ -2732,6 +2808,8 @@
         const [formData, setFormData] = useState({ ...DEFAULT_FORM_DATA });
         // State Zoom Ảnh
         const [zoomImage, setZoomImage] = useState(null);
+        // State clipboard cho cột Đơn vị thực hiện
+        const [clipboardDonVi, setClipboardDonVi] = useState("");
 
         // --- HÀM TỔNG HỢP: TẢI TOÀN BỘ DỮ LIỆU NỀN MỚI NHẤT ---
         const refreshAllBackgroundData = async () => {
@@ -2786,17 +2864,17 @@
         { label: "Trụ", content: "{tru_chinh}/", inline: true },
         { label: "tuyến", content: "tuyến", inline: true }, 
         { label: "Tuyến", content: "{tuyen}", inline: true },
-        { label: "Cắt CB", content: "- Cắt CB trụ {tru} tuyến {tuyen}." }, 
-        { label: "Cắt 1FCO", content: "- Cắt 01 FCO trụ {tru} tuyến {tuyen}." }, 
-        { label: "Cắt 2FCO", content: "- Cắt 02 FCO trụ {tru} tuyến {tuyen}." }, 
-        { label: "Cắt 3FCO", content: "- Cắt 03 FCO trụ {tru} tuyến {tuyen}." }, 
-        { label: "TĐ HA", content: "- Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}." }, 
-        { label: "Tháo lèo", content: "- Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}." }, 
-        { label: "Khóa tủ", content: "- Khóa tủ CB trụ {tru} tuyến {tuyen}." }, 
-        { label: "TĐ TT", content: "- Thử điện, tiếp địa trung áp 02 bộ tại trụ {tru} tuyến {tuyen}." },
-        { label: "Cắt 3LBFCO", content: "- Cắt 03 LBFCO trụ {tru_chinh}/ tuyến {tuyen}" },
-        { label: "Cắt MC", content: "- Cắt MC + 03 DS trụ {tru_chinh}/ tuyến {tuyen}." },
-        { label: "Cắt LBS", content: "- Cắt LBS + 03 DS trụ {tru_chinh}/ tuyến {tuyen}." },
+        { label: "Cắt CB", content: "Cắt CB trụ {tru} tuyến {tuyen}." }, 
+        { label: "Cắt 1FCO", content: "Cắt 01 FCO trụ {tru} tuyến {tuyen}." }, 
+        { label: "Cắt 2FCO", content: "Cắt 02 FCO trụ {tru} tuyến {tuyen}." }, 
+        { label: "Cắt 3FCO", content: "Cắt 03 FCO trụ {tru} tuyến {tuyen}." }, 
+        { label: "TĐ HA", content: "Thử điện, tiếp địa hạ áp 01 bộ tại trụ {tru} tuyến {tuyen}." }, 
+        { label: "Tháo lèo", content: "Tháo 03 nối rẽ trụ {tru} tuyến {tuyen}." }, 
+        { label: "Khóa tủ", content: "Khóa tủ CB trụ {tru} tuyến {tuyen}." }, 
+        { label: "TĐ TT", content: "Thử điện, tiếp địa trung áp 02 bộ tại trụ {tru} tuyến {tuyen}." },
+        { label: "Cắt 3LBFCO", content: "Cắt 03 LBFCO trụ {tru_chinh}/ tuyến {tuyen}" },
+        { label: "Cắt MC", content: "Cắt MC + 03 DS trụ {tru_chinh}/ tuyến {tuyen}." },
+        { label: "Cắt LBS", content: "Cắt LBS + 03 DS trụ {tru_chinh}/ tuyến {tuyen}." },
         ];
 
         const tags9b = [ { label: "Mẫu chuẩn", content: "- Chuẩn bị trang thiết bị, dụng cụ thi công.\n- Trang bị đầy đủ bảo hộ lao động, dụng cụ an toàn cá nhân.\n- Không được vượt khỏi phạm vi cho phép làm việc.\n- Trả điện đúng thời gian đăng ký." } ];
@@ -2906,20 +2984,20 @@ const generateDiagramImage = async (data) => {
                 });
                 svgContent += `</svg>`;
 
-                // 3. VẼ LÊN CANVAS & ÁP DỤNG FILTER
+                // 3. VẼ LÊN CANVAS & ÁP DỤNG FILTER (render 2x để nét hơn)
+                const SCALE = 2;
                 const canvas = document.createElement('canvas'); 
-                canvas.width = width; 
-                canvas.height = height; 
+                canvas.width = width * SCALE; 
+                canvas.height = height * SCALE; 
                 const ctx = canvas.getContext('2d'); 
+                ctx.scale(SCALE, SCALE);
                 
-                // --- ÁP DỤNG COLOR SATURATION TẠI ĐÂY ---
-                // saturate(66%) làm màu nhạt đi. contrast(110%) để nét vẽ đậm đà hơn chút
                 ctx.filter = 'saturate(66%) contrast(110%)'; 
                 
                 const img = new Image();
                 img.onload = () => { 
                     ctx.drawImage(img, 0, 0); 
-                    // Xuất ra PNG (hỗ trợ trong suốt)
+                    // Trả về kích thước GỐC (không nhân SCALE) để caller tính tỉ lệ đúng
                     resolve({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height }); 
                 };
                 img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgContent)));
@@ -3008,11 +3086,19 @@ const generateDiagramImage = async (data) => {
                 }
             }
 
-            // Tải trước ảnh chữ ký của các vị trí chính
-            const dvctUserId1 = sourceForm.dvct_userId1;
-            const qlvhUserId1 = sourceForm.qlvh_userId1;
-            const dvctSig = dvctUserId1 && sigMap[dvctUserId1] ? await fetchSigBuffer(sigMap[dvctUserId1].profiles?.chu_ky_url) : null;
-            const qlvhSig = qlvhUserId1 && sigMap[qlvhUserId1] ? await fetchSigBuffer(sigMap[qlvhUserId1].profiles?.chu_ky_url) : null;
+            // Tải chữ ký tất cả các slot
+            const fetchSig = async (userId) => userId && sigMap[userId]?.profiles?.chu_ky_url
+                ? await fetchSigBuffer(sigMap[userId].profiles.chu_ky_url) : null;
+
+            const dvctSig1 = await fetchSig(sourceForm.dvct_userId1);
+            const dvctSig2 = await fetchSig(sourceForm.dvct_userId2);
+            const qlvhSig1 = await fetchSig(sourceForm.qlvh_userId1);
+            const qlvhSig2 = await fetchSig(sourceForm.qlvh_userId2);
+            const qlvhSig3 = await fetchSig(sourceForm.qlvh_userId3);
+
+            // Giữ tên biến cũ để dùng trong code (slot 1)
+            const dvctSig = dvctSig1;
+            const qlvhSig = qlvhSig1;
 
             const formatDTWord = (iso) => {
                 if (!iso) return "";
@@ -3301,53 +3387,63 @@ const generateDiagramImage = async (data) => {
                         
 
                         // HÀNG CHỮ KÝ (3 CỘT)
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} },
-                            rows: [
-                                new TableRow({ children: [
-                                    new TableCell({ children: [createPara("ĐƠN VỊ CÔNG TÁC", true, 24, AlignmentType.CENTER)] }),
-                                    new TableCell({ children: [createPara("ĐƠN VỊ QLVH", true, 24, AlignmentType.CENTER)] }),
-                                    new TableCell({ children: [createPara("ĐƠN VỊ LIÊN QUAN KHÁC", true, 24, AlignmentType.CENTER)] })
-                                ] }),
-                                new TableRow({ children: [
-                                    // CỘT 1: DVCT
-                                    new TableCell({ children: [
-                                        ...(dvctSig ? [
-                                            new Paragraph({
-                                                alignment: AlignmentType.CENTER,
-                                                children: [new window.docx.ImageRun({ data: dvctSig, transformation: { width: 120, height: 60 } })]
-                                            }),
-                                            createPara(sourceForm.dvct_daiDien1, true, 24, AlignmentType.CENTER)
-                                        ] : [
+                        (() => {
+                            // Helper tạo nội dung 1 slot chữ ký trong Word
+                            const sigSlotWord = (sig, name) => sig ? [
+                                new Paragraph({
+                                    alignment: AlignmentType.CENTER,
+                                    children: [new window.docx.ImageRun({ data: sig, transformation: { width: 120, height: 60 } })]
+                                }),
+                                createPara(name || "", true, 24, AlignmentType.CENTER)
+                            ] : [
+                                createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true),
+                                createPara("", false, 24), createPara("", false, 24), createPara("", false, 24),
+                                createPara(name || "", true, 24, AlignmentType.CENTER)
+                            ];
+
+                            // Tạo nội dung cột DVCT (1 hoặc 2 người)
+                            const dvctContent = [
+                                ...sigSlotWord(dvctSig1, sourceForm.dvct_daiDien1),
+                                ...(sourceForm.dvct_daiDien2 ? [
+                                    createPara("", false, 24),
+                                    ...sigSlotWord(dvctSig2, sourceForm.dvct_daiDien2)
+                                ] : [])
+                            ];
+
+                            // Tạo nội dung cột QLVH (1, 2 hoặc 3 người)
+                            const qlvhContent = [
+                                ...sigSlotWord(qlvhSig1, sourceForm.qlvh_daiDien1),
+                                ...(sourceForm.qlvh_daiDien2 ? [
+                                    createPara("", false, 24),
+                                    ...sigSlotWord(qlvhSig2, sourceForm.qlvh_daiDien2)
+                                ] : []),
+                                ...(sourceForm.qlvh_daiDien3 ? [
+                                    createPara("", false, 24),
+                                    ...sigSlotWord(qlvhSig3, sourceForm.qlvh_daiDien3)
+                                ] : [])
+                            ];
+
+                            return new Table({
+                                width: { size: 100, type: WidthType.PERCENTAGE },
+                                borders: { top: {style: BorderStyle.NONE}, bottom: {style: BorderStyle.NONE}, left: {style: BorderStyle.NONE}, right: {style: BorderStyle.NONE}, insideVertical: {style: BorderStyle.NONE}, insideHorizontal: {style: BorderStyle.NONE} },
+                                rows: [
+                                    new TableRow({ children: [
+                                        new TableCell({ children: [createPara("ĐƠN VỊ CÔNG TÁC", true, 24, AlignmentType.CENTER)] }),
+                                        new TableCell({ children: [createPara("ĐƠN VỊ QLVH", true, 24, AlignmentType.CENTER)] }),
+                                        new TableCell({ children: [createPara("ĐƠN VỊ LIÊN QUAN KHÁC", true, 24, AlignmentType.CENTER)] })
+                                    ]}),
+                                    new TableRow({ children: [
+                                        new TableCell({ children: dvctContent }),
+                                        new TableCell({ children: qlvhContent }),
+                                        new TableCell({ children: [
                                             createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true),
                                             createPara("", false, 24), createPara("", false, 24), createPara("", false, 24),
-                                            createPara(sourceForm.dvct_daiDien1, true, 24, AlignmentType.CENTER)
-                                        ])
-                                    ] }),
-                                    // CỘT 2: QLVH
-                                    new TableCell({ children: [
-                                        ...(qlvhSig ? [
-                                            new Paragraph({
-                                                alignment: AlignmentType.CENTER,
-                                                children: [new window.docx.ImageRun({ data: qlvhSig, transformation: { width: 120, height: 60 } })]
-                                            }),
-                                            createPara(sourceForm.qlvh_daiDien1, true, 24, AlignmentType.CENTER)
-                                        ] : [
-                                            createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true),
-                                            createPara("", false, 24), createPara("", false, 24), createPara("", false, 24),
-                                            createPara(sourceForm.qlvh_daiDien1, true, 24, AlignmentType.CENTER)
-                                        ])
-                                    ] }),
-                                    // CỘT 3: LIÊN QUAN
-                                    new TableCell({ children: [
-                                        createPara("(Ký, ghi rõ họ tên)", false, 24, AlignmentType.CENTER, true),
-                                        createPara("", false, 24), createPara("", false, 24), createPara("", false, 24),
-                                        createPara("", true, 24, AlignmentType.CENTER)
-                                    ] })
-                                ] })
-                            ]
-                        }),
+                                            createPara("", true, 24, AlignmentType.CENTER)
+                                        ]})
+                                    ]})
+                                ]
+                            });
+                        })(),
 
                         
                         createPara("", false, 24), createPara("", false, 24),
@@ -3358,6 +3454,294 @@ const generateDiagramImage = async (data) => {
                 }]
             });
             Packer.toBlob(doc).then(blob => { saveAs(blob, filename); });
+        };
+
+
+
+        // --- HÀM XUẤT PDF (DÙNG PDFMAKE + TIMES NEW ROMAN) ---
+        const handleExportPdf = async (targetReport = null) => {
+            showToast("Đang tải dữ liệu Font và tạo PDF, vui lòng đợi...", "info", 4000);
+
+            // 1. TẢI FONT TIMES NEW ROMAN TỪ SUPABASE (Chỉ tải 1 lần)
+            if (!window.pdfMake.vfs || !window.pdfMake.vfs['times.ttf']) {
+                try {
+                    const FONT_URLS = {
+                        'times.ttf': 'https://ujxykapkciwsbryulwur.supabase.co/storage/v1/object/public/fonts/times.ttf',
+                        'timesbd.ttf': 'https://ujxykapkciwsbryulwur.supabase.co/storage/v1/object/public/fonts/timesbd.ttf',
+                        'timesi.ttf': 'https://ujxykapkciwsbryulwur.supabase.co/storage/v1/object/public/fonts/timesi.ttf',
+                        'timesbi.ttf': 'https://ujxykapkciwsbryulwur.supabase.co/storage/v1/object/public/fonts/timesbi.ttf'
+                    };
+                    
+                    window.pdfMake.vfs = window.pdfMake.vfs || {};
+                    const fetchPromises = Object.entries(FONT_URLS).map(async ([fileName, url]) => {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error(`Lỗi tải ${fileName}`);
+                        const buffer = await response.arrayBuffer();
+                        let binary = '';
+                        const bytes = new Uint8Array(buffer);
+                        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                        window.pdfMake.vfs[fileName] = window.btoa(binary);
+                    });
+                    
+                    await Promise.all(fetchPromises);
+                    window.pdfMake.fonts = {
+                        ...window.pdfMake.fonts,
+                        'Times New Roman': { normal: 'times.ttf', bold: 'timesbd.ttf', italics: 'timesi.ttf', bolditalics: 'timesbi.ttf' }
+                    };
+                } catch (err) {
+                    console.error("Lỗi nạp font:", err);
+                    showToast("Không tải được Font Times New Roman, sẽ dùng font mặc định.", "warning");
+                }
+            }
+
+            // 2. CHUẨN BỊ DỮ LIỆU
+            const txtDots = (val, dots = 30) => (val && val.trim() !== "") ? val : ".".repeat(dots);
+            const sourceForm = targetReport ? targetReport.du_lieu_form : formData;
+            const sourceDiagram = targetReport ? targetReport.du_lieu_so_do : diagramData;
+            
+            const d = String(sourceForm.ngay).padStart(2, '0');
+            const m = String(sourceForm.thang).padStart(2, '0');
+            const cleanTuyen = (sourceForm.loc_lineName || "").replace(/[\\/:*?"<>|]/g, "_");
+            let rawTru = sourceForm.loc_poleCode || "Moi";
+            if (sourceForm.loc_subCode) rawTru += "/" + sourceForm.loc_subCode;
+            const cleanTru = rawTru.replace(/\//g, ".").replace(/[\\:*?"<>|]/g, "_");
+            const filename = `${d}-${m}-${sourceForm.nam}-${cleanTuyen}-${cleanTru}.pdf`;
+
+            if (targetReport && targetReport.id) {
+                const downloaded = JSON.parse(localStorage.getItem('downloaded_reports') || '[]');
+                if (!downloaded.includes(targetReport.id)) {
+                    downloaded.push(targetReport.id);
+                    localStorage.setItem('downloaded_reports', JSON.stringify(downloaded));
+                    window.dispatchEvent(new Event('storage'));
+                }
+            }
+
+            const fetchSigDataUrl = async (url) => {
+                if (!url) return null;
+                try {
+                    const res = await fetch(url);
+                    const blob = await res.blob();
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) { return null; }
+            };
+
+            const bienBanId = targetReport ? targetReport.id : currentReportId;
+            let sigMap = {}; 
+            if (bienBanId) {
+                const { data: sigData } = await supabase.from('signature_requests').select('user_id, vai_tro, thu_tu, trang_thai, thoi_gian_ky').eq('bien_ban_id', bienBanId).eq('trang_thai', 'da_ky');
+                if (sigData && sigData.length > 0) {
+                    const signerIds = sigData.map(s => s.user_id);
+                    const { data: signerProfiles } = await supabase.from('profiles').select('id, ho_ten, email, chu_ky_url').in('id', signerIds);
+                    sigData.forEach(s => { sigMap[s.user_id] = { ...s, profiles: signerProfiles?.find(p => p.id === s.user_id) || {} }; });
+                }
+            }
+
+            const fetchSigPdf = async (userId) => userId && sigMap[userId]?.profiles?.chu_ky_url
+                ? await fetchSigDataUrl(sigMap[userId].profiles.chu_ky_url) : null;
+
+            const dvctSig1 = await fetchSigPdf(sourceForm.dvct_userId1);
+            const dvctSig2 = await fetchSigPdf(sourceForm.dvct_userId2);
+            const qlvhSig1 = await fetchSigPdf(sourceForm.qlvh_userId1);
+            const qlvhSig2 = await fetchSigPdf(sourceForm.qlvh_userId2);
+            const qlvhSig3 = await fetchSigPdf(sourceForm.qlvh_userId3);
+
+            const dvctSig = dvctSig1;
+            const qlvhSig = qlvhSig1;
+
+            let diagramImage = null;
+            let pdfImgWidth = 400, pdfImgHeight = 300;
+            if (sourceDiagram && sourceDiagram.length > 0) {
+                try {
+                    const { dataUrl, width, height } = await generateDiagramImage(sourceDiagram);
+                    diagramImage = dataUrl;
+                    // Word dùng MAX_WIDTH=600 (đơn vị docx EMU)
+                    // PDF points: 600/595*515 ≈ 420pt → dùng cùng tỉ lệ
+                    const wordMaxWidth = 600;
+                    const wordImgWidth = Math.min(width, wordMaxWidth);
+                    const PDF_SCALE = 515 / 595;
+                    pdfImgWidth = wordImgWidth * PDF_SCALE;
+                    pdfImgHeight = (height / width) * pdfImgWidth;
+                } catch (e) {}
+            }
+
+            const dateMuc7 = formatDateVN(sourceForm.muc7_ngay);
+            const pStart = `${sourceForm.loc_poleCode}${sourceForm.loc_subCode ? "/" + sourceForm.loc_subCode : ""}`;
+            const locationString = sourceForm.is_range 
+                ? `từ trụ ${pStart} đến trụ ${sourceForm.loc_poleCode_to}${sourceForm.loc_subCode_to ? "/" + sourceForm.loc_subCode_to : ""}`
+                : `tại trụ ${pStart}`;
+            const maDinhDanh = targetReport?.ma_dinh_danh || "";
+
+            // 3. TẠO FILE PDF (DÙNG TIMES NEW ROMAN)
+            const docDefinition = {
+                pageSize: 'A4',
+                pageMargins: [40, 40, 40, 40],
+                // Ép toàn bộ văn bản dùng font Times New Roman
+                defaultStyle: { 
+                    font: window.pdfMake.fonts && window.pdfMake.fonts['Times New Roman'] ? 'Times New Roman' : 'Roboto', 
+                    fontSize: 12, 
+                    lineHeight: 1.2 
+                },
+                footer: function(currentPage, pageCount) {
+                    return {
+                        columns: [
+                            { text: maDinhDanh ? `Mã biên bản: ${maDinhDanh}` : "", alignment: 'left', color: '#888888', italics: true, margin: [40, 0] },
+                            { text: `Trang ${currentPage}/${pageCount}`, alignment: 'right', color: '#888888', margin: [0, 0, 40, 0] }
+                        ],
+                        fontSize: 10
+                    };
+                },
+                content: [
+                    // HEADER Chuẩn Nghị định 30 (Kẻ gạch chân bằng Canvas)
+                    {
+                        table: {
+                            widths: ['50%', '50%'],
+                            body: [
+                                [
+                                    { text: 'CÔNG TY ĐIỆN LỰC AN GIANG', alignment: 'center', margin: [0, 0, 0, 2] },
+                                    { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', alignment: 'center', bold: true, margin: [0, 0, 0, 2] }
+                                ],
+                                [
+                                    {
+                                        stack: [
+                                            { text: sourceForm.donVi.toUpperCase(), alignment: 'center', bold: true, margin: [0, 0, 0, 2] },
+                                            { canvas: [{ type: 'line', x1: 97, y1: 0, x2: 161, y2: 0, lineWidth: 0.7 }] }
+                                        ]
+                                    },
+                                    {
+                                        stack: [
+                                            { text: 'Độc lập - Tự do - Hạnh phúc', alignment: 'center', bold: true, margin: [0, 0, 0, 2] },
+                                            { canvas: [{ type: 'line', x1: 54, y1: 0, x2: 199, y2: 0, lineWidth: 0.7 }] }
+                                        ]
+                                    }
+                                ],
+                                [
+                                    {},
+                                    { text: `Châu Phú, ngày ${sourceForm.ngay} tháng ${sourceForm.thang} năm ${sourceForm.nam}`, alignment: 'center', italics: true, margin: [0, 10, 0, 15] }
+                                ]
+                            ]
+                        },
+                        layout: 'noBorders'
+                    },
+
+                    // TITLE
+                    { text: 'BIÊN BẢN KHẢO SÁT HIỆN TRƯỜNG', alignment: 'center', bold: true, fontSize: 14, margin: [0, 10, 0, 15] },
+
+                    // BODY
+                    { text: `Vào hồi ${sourceForm.gioKhaoSat}, ${locationString} tuyến ${sourceForm.loc_lineName}, xã ${sourceForm.loc_commune}, tỉnh An Giang.`, alignment: 'justify', margin: [0, 0, 0, 10] },
+                    { text: 'Chúng tôi gồm:', bold: true, margin: [0, 0, 0, 5] },
+                    { text: '1. Đại diện Đơn vị công tác:', bold: true, margin: [0, 0, 0, 5] },
+                    {
+                        table: {
+                            widths: ['60%', '40%'],
+                            body: [
+                                [{ text: `1.1. Ông (Bà): ${txtDots(sourceForm.dvct_daiDien1, 35)}` }, { text: `Chức vụ: ${txtDots(sourceForm.dvct_chucVu1, 20)}` }],
+                                [{ text: `1.2. Ông (Bà): ${txtDots(sourceForm.dvct_daiDien2, 35)}` }, { text: `Chức vụ: ${txtDots(sourceForm.dvct_chucVu2, 20)}` }]
+                            ]
+                        },
+                        layout: 'noBorders', margin: [0, 0, 0, 10]
+                    },
+                    { text: '2. Đại diện (các) Đơn vị QLVH:', bold: true, margin: [0, 0, 0, 5] },
+                    {
+                        table: {
+                            widths: ['45%', '25%', '30%'],
+                            body: [
+                                [{ text: `2.1. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien1, 25)}` }, { text: `Chức vụ: ${txtDots(sourceForm.qlvh_chucVu1, 15)}` }, { text: `Đơn vị: ${txtDots(sourceForm.qlvh_donVi1, 15)}` }],
+                                [{ text: `2.2. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien2, 25)}` }, { text: `Chức vụ: ${txtDots(sourceForm.qlvh_chucVu2, 15)}` }, { text: `Đơn vị: ${txtDots(sourceForm.qlvh_donVi2, 15)}` }],
+                                [{ text: `2.3. Ông (Bà): ${txtDots(sourceForm.qlvh_daiDien3, 25)}` }, { text: `Chức vụ: ${txtDots(sourceForm.qlvh_chucVu3, 15)}` }, { text: `Đơn vị: ${txtDots(sourceForm.qlvh_donVi3, 15)}` }]
+                            ]
+                        },
+                        layout: 'noBorders', margin: [0, 0, 0, 10]
+                    },
+                    { text: [{text: '3. Đại diện các đơn vị có liên quan: ', bold: true}, txtDots(sourceForm.dv_lienQuan, 88)], margin: [0, 0, 0, 10] },
+                    { text: 'Cùng nhau khảo sát thực tế, trao đổi và thống nhất phân công trách nhiệm thực hiện những nội dung để đảm bảo an toàn về điện cho Đơn vị công tác khi tiến hành công việc, cụ thể như sau:', alignment: 'justify', margin: [0, 0, 0, 10] },
+                    { text: [{text: '4. Địa điểm (hoặc thiết bị) thực hiện công việc: ', bold: true}, sourceForm.muc4_diaDiem + "."], margin: [0, 0, 0, 10] },
+                    { text: [{text: '5. Nội dung công việc: ', bold: true}, sourceForm.muc5_noiDung + "."], margin: [0, 0, 0, 10] },
+                    { text: [{text: '6. Phạm vi làm việc: ', bold: true}, sourceForm.muc6_phamVi + "."], margin: [0, 0, 0, 10] },
+                    { text: [{text: '7. Thời gian tiến hành công việc: ', bold: true}, `Từ ${sourceForm.muc7_thoiGianTu} đến ${sourceForm.muc7_thoiGianDen}, ngày ${dateMuc7}.`], margin: [0, 0, 0, 10] },
+                    
+                    { text: '8. Đánh giá rủi ro / Trách nhiệm của các đơn vị liên quan:', bold: true, margin: [0, 0, 0, 5] },
+                    {
+                        table: {
+                            headerRows: 1,
+                            widths: ['8%', '40%', '37%', '15%'],
+                            body: [
+                                [
+                                    { text: 'STT', bold: true, alignment: 'center', fillColor: '#eeeeee' },
+                                    { text: 'Công việc, vị trí và nhận diện mối nguy', bold: true, alignment: 'center', fillColor: '#eeeeee' },
+                                    { text: 'Biện pháp an toàn', bold: true, alignment: 'center', fillColor: '#eeeeee' },
+                                    { text: 'Đơn vị thực hiện', bold: true, alignment: 'center', fillColor: '#eeeeee' }
+                                ],
+                                ...sourceForm.muc8_bangData.map((row, idx) => [
+                                    { text: (idx + 1).toString(), alignment: 'center' },
+                                    { text: row.congViec || "" },
+                                    { text: row.bienPhap || "" },
+                                    { text: row.donVi || "", alignment: 'center' }
+                                ])
+                            ]
+                        },
+                        margin: [0, 0, 0, 15]
+                    },
+
+                    { text: `Biên bản này được lập thành ${sourceForm.soBan} bản và được tất cả mọi người dự họp là đại diện của các đơn vị có liên quan đến công việc đồng ý, thông qua để làm cơ sở tiến hành công việc sau này (nếu không thay đổi về những nội dung chính) và ký tên dưới đây.`, alignment: 'justify', margin: [0, 0, 0, 20] },
+
+                    // CHỮ KÝ
+                    (() => {
+                        // Helper tạo stack 1 slot chữ ký trong PDF
+                        const sigSlotPdf = (sig, name) => ({
+                            stack: [
+                                sig
+                                    ? { image: sig, width: 100, alignment: 'center', margin: [0, 5, 0, 5] }
+                                    : { text: '(Ký, ghi rõ họ tên)', italics: true, alignment: 'center', margin: [0, 5, 0, 40] },
+                                { text: name || "", bold: true, alignment: 'center' }
+                            ]
+                        });
+
+                        // Cột DVCT
+                        const dvctStack = { stack: [
+                            sigSlotPdf(dvctSig1, sourceForm.dvct_daiDien1),
+                            ...(sourceForm.dvct_daiDien2 ? [{ text: '', margin: [0, 5] }, sigSlotPdf(dvctSig2, sourceForm.dvct_daiDien2)] : [])
+                        ]};
+
+                        // Cột QLVH
+                        const qlvhStack = { stack: [
+                            sigSlotPdf(qlvhSig1, sourceForm.qlvh_daiDien1),
+                            ...(sourceForm.qlvh_daiDien2 ? [{ text: '', margin: [0, 5] }, sigSlotPdf(qlvhSig2, sourceForm.qlvh_daiDien2)] : []),
+                            ...(sourceForm.qlvh_daiDien3 ? [{ text: '', margin: [0, 5] }, sigSlotPdf(qlvhSig3, sourceForm.qlvh_daiDien3)] : [])
+                        ]};
+
+                        return {
+                            table: {
+                                widths: ['33%', '33%', '34%'],
+                                body: [
+                                    [
+                                        { text: 'ĐƠN VỊ CÔNG TÁC', bold: true, alignment: 'center' },
+                                        { text: 'ĐƠN VỊ QLVH', bold: true, alignment: 'center' },
+                                        { text: 'ĐƠN VỊ LIÊN QUAN KHÁC', bold: true, alignment: 'center' }
+                                    ],
+                                    [
+                                        dvctStack,
+                                        qlvhStack,
+                                        { text: '(Ký, ghi rõ họ tên)', italics: true, alignment: 'center', margin: [0, 5, 0, 50] }
+                                    ]
+                                ]
+                            },
+                            layout: 'noBorders', margin: [0, 0, 0, 30]
+                        };
+                    })(),
+
+                    // SƠ ĐỒ
+                    { text: 'SƠ ĐỒ MỘT SỢI KẾT NỐI THIẾT BỊ, LƯỚI ĐIỆN NƠI LÀM VIỆC', bold: true, alignment: 'center' },
+                    { text: '(Kèm theo Biên bản khảo sát hiện trường)', italics: true, alignment: 'center', margin: [0, 0, 0, 10] },
+                    diagramImage ? { image: diagramImage, width: pdfImgWidth, height: pdfImgHeight, alignment: 'center' } : { text: '(Chưa có sơ đồ)', italics: true, alignment: 'center' }
+                ]
+            };
+
+            // 4. IN FILE
+            pdfMake.createPdf(docDefinition).download(filename);
         };
 
         const [signatureStatus, setSignatureStatus] = useState([]);
@@ -3406,7 +3790,7 @@ const generateDiagramImage = async (data) => {
             
             // Kiểm tra dữ liệu bắt buộc
             if (!formData.loc_poleCode) { 
-                alert("Vui lòng nhập Mã trụ trước khi lưu!"); 
+                alert("Vui lòng nhập Số trụ trước khi lưu!"); 
                 return;
             }
 
@@ -3452,7 +3836,7 @@ const generateDiagramImage = async (data) => {
 
             // --- 4. XỬ LÝ KẾT QUẢ ---
             if (error) {
-                alert("Lỗi khi lưu: " + error.message);
+                showToast("Lỗi khi lưu: " + error.message, "error");
             } else {
                 // --- 5. TẠO SIGNATURE_REQUESTS CHO CÁC NGƯỜI CÓ TÀI KHOẢN ---
                 // Lấy bien_ban_id: nếu đang sửa thì dùng currentReportId, nếu tạo mới thì dùng ID vừa insert
@@ -3502,7 +3886,7 @@ const generateDiagramImage = async (data) => {
                     }
                 }
 
-                alert("Đã lưu thành công!");
+                showToast("Đã lưu biên bản thành công!");
                 setIsReadOnly(false);
                 setShowReportList(true);
             }
@@ -3510,7 +3894,7 @@ const generateDiagramImage = async (data) => {
 
         const handleLoadReport = async (id, readOnly = false) => {
             const { data, error } = await supabase.from('bien_ban_khao_sat').select('*').eq('id', id).single();
-            if (error) { alert("Lỗi tải biên bản: " + error.message); } 
+            if (error) { showToast("Lỗi tải biên bản: " + error.message, "error"); }
             else if (data) {
                 fetchSignatureStatus(id);
                 const savedForm = data.du_lieu_form || {};
@@ -3702,6 +4086,8 @@ const generateDiagramImage = async (data) => {
         if (!isAuthenticated) return <LoginScreen onLogin={handleLogin} loading={isCheckingAuth} />;
 
         return (
+            <ToastContext.Provider value={showToast}>
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
             <div className="pb-20">
                 {/* --- MODAL PHÓNG TO ẢNH (MỚI - TOÀN MÀN HÌNH ĐEN) --- */}
                 {zoomImage && (
@@ -3767,13 +4153,15 @@ const generateDiagramImage = async (data) => {
                     onCreateNew={handleCreateNew} 
                     onLoad={handleLoadReport} 
                     onExport={handleExportDocx} 
-                    onZoom={(url) => setZoomImage(url)} 
+                    onExportPdf={handleExportPdf} // <--- DÒNG NÀY ĐƯỢC THÊM VÀO
+                    onZoom={(url) => setZoomImage(url)}
                     onLogout={handleLogout}
                     onOpenCreateAccount={() => setShowCreateAccountModal(true)}
                     onOpenAccountManager={() => setShowAccountManagerModal(true)}
                     onOpenProfile={() => setShowProfileModal(true)}
                     onSign={(sigReq) => setSigningRequest(sigReq)}
                     onCopy={handleCopyReport}
+                    showToast={showToast}
                     pendingCount={pendingCount}
                     currentUser={currentUser}
                     currentUserId={currentUserId}
@@ -3804,12 +4192,23 @@ const generateDiagramImage = async (data) => {
                             >
                                 <UI_Icons.X size={16}/> Đóng
                             </button>
-                            <button 
-                                onClick={() => handleExportDocx(null)} 
-                                className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-100 text-xs md:text-sm"
-                            >
-                                <UI_Icons.Download size={16}/> <span className="hidden md:inline">Tải Word</span>
-                            </button>
+                            {/* NHÓM NÚT TẢI XUỐNG */}
+                            <div className="flex bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+                                <button 
+                                    onClick={() => handleExportDocx(null)} 
+                                    className="px-3 py-2 font-bold text-blue-700 flex items-center gap-2 hover:bg-blue-100 border-r border-blue-200 text-xs md:text-sm transition-colors"
+                                    title="Tải file Word (.docx)"
+                                >
+                                    <UI_Icons.FileText size={16}/> <span className="hidden md:inline">Word</span>
+                                </button>
+                                <button 
+                                    onClick={() => handleExportPdf(null)} 
+                                    className="px-3 py-2 font-bold text-red-600 flex items-center gap-2 hover:bg-red-50 text-xs md:text-sm transition-colors"
+                                    title="Tải file PDF"
+                                >
+                                    <UI_Icons.Download size={16}/> <span className="hidden md:inline">PDF</span>
+                                </button>
+                            </div>
                             {/* Nút Ký chỉ hiện nếu user còn yêu cầu chờ ký trên biên bản này */}
                             {(() => {
                                 const myReq = signatureStatus.find(s => s.user_id === currentUserId && s.trang_thai === 'cho_ky');
@@ -3868,7 +4267,24 @@ const generateDiagramImage = async (data) => {
 
                             <button onClick={() => setShowRiskManager(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-orange-200 border border-orange-300" title="Quản lý Mối Nguy"><UI_Icons.Plus size={18}/> <span className="hidden md:inline">Mối Nguy</span></button>
                             <button onClick={handleSaveCloud} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 active:scale-95 transition-all shadow-md"><UI_Icons.Save size={18}/> Lưu & Thoát</button>
-                            <button onClick={() => handleExportDocx(null)} className="bg-blue-600 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md"><UI_Icons.Download size={18}/></button>
+                            
+                            {/* NHÓM NÚT XUẤT FILE Ở CHẾ ĐỘ SỬA */}
+                            <div className="flex bg-blue-600 rounded-lg shadow-md overflow-hidden">
+                                <button 
+                                    onClick={() => handleExportDocx(null)} 
+                                    className="text-white px-3 py-2 font-bold flex items-center hover:bg-blue-700 border-r border-blue-500 transition-colors"
+                                    title="Tải Word"
+                                >
+                                    <UI_Icons.FileText size={18}/>
+                                </button>
+                                <button 
+                                    onClick={() => handleExportPdf(null)} 
+                                    className="text-white px-3 py-2 font-bold flex items-center hover:bg-red-600 transition-colors"
+                                    title="Tải PDF"
+                                >
+                                    <UI_Icons.Download size={18}/>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -3965,9 +4381,9 @@ const generateDiagramImage = async (data) => {
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{formData.is_range ? "Bắt đầu từ trụ" : "Vị trí tại trụ"}</label>
                                 <div className="flex gap-2 items-center border border-gray-300 rounded-lg p-2 bg-gray-50 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 focus-within:bg-white transition-all">
                                     <span className="font-bold text-gray-600 text-sm">Trụ</span>
-                                    <input list="pole-list" className="w-16 md:w-20 bg-transparent font-bold text-blue-800 outline-none text-sm text-center border-b border-gray-400 focus:border-blue-600" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Mã..." />
+                                    <input list="pole-list" className="w-16 md:w-20 bg-transparent font-bold text-blue-800 outline-none text-sm text-center border-b border-gray-400 focus:border-blue-600" value={formData.loc_poleCode} onChange={handlePoleChange} placeholder="Tuyến..." />
                                     <span className="font-bold text-gray-400">/</span>
-                                    <input className="flex-1 bg-transparent font-bold text-blue-800 outline-none text-sm border-b border-gray-400 focus:border-blue-600" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="Số nhánh (nếu có)..." />
+                                    <input className="flex-1 bg-transparent font-bold text-blue-800 outline-none text-sm border-b border-gray-400 focus:border-blue-600" value={formData.loc_subCode} onChange={e => setFormData({...formData, loc_subCode: e.target.value})} placeholder="Số trụ..." />
                                 </div>
                             </div>
 
@@ -3977,9 +4393,9 @@ const generateDiagramImage = async (data) => {
                                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Đến trụ kết thúc</label>
                                     <div className="flex gap-2 items-center border border-gray-300 rounded-lg p-2 bg-gray-50 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 focus-within:bg-white transition-all">
                                         <span className="font-bold text-gray-600 text-sm">Trụ</span>
-                                        <input list="pole-list" className="w-16 md:w-20 bg-transparent font-bold text-blue-800 outline-none text-sm text-center border-b border-gray-400 focus:border-blue-600" value={formData.loc_poleCode_to} onChange={e => setFormData({...formData, loc_poleCode_to: e.target.value})} placeholder="Mã..." />
+                                        <input list="pole-list" className="w-16 md:w-20 bg-transparent font-bold text-blue-800 outline-none text-sm text-center border-b border-gray-400 focus:border-blue-600" value={formData.loc_poleCode_to} onChange={e => setFormData({...formData, loc_poleCode_to: e.target.value})} placeholder="Tuyến..." />
                                         <span className="font-bold text-gray-400">/</span>
-                                        <input className="flex-1 bg-transparent font-bold text-blue-800 outline-none text-sm border-b border-gray-400 focus:border-blue-600" value={formData.loc_subCode_to} onChange={e => setFormData({...formData, loc_subCode_to: e.target.value})} placeholder="Số nhánh (nếu có)..." />
+                                        <input className="flex-1 bg-transparent font-bold text-blue-800 outline-none text-sm border-b border-gray-400 focus:border-blue-600" value={formData.loc_subCode_to} onChange={e => setFormData({...formData, loc_subCode_to: e.target.value})} placeholder="Số trụ..." />
                                     </div>
                                 </div>
                             )}
@@ -4219,64 +4635,37 @@ const generateDiagramImage = async (data) => {
                                         <td className="border border-gray-300 text-center font-bold">{index + 1}</td>
                                         
 
-                                        {/* CỘT 2: CÔNG VIỆC VÀ MỐI NGUY (Đã nâng cấp Modal Tìm Kiếm & Accordion) */}
+                                        {/* CỘT 1: MỐI NGUY */}
                                         <td className="border border-gray-300 p-2 align-top relative">
-                                            <div className="flex flex-col gap-2 mb-2 pb-2 border-b border-gray-100 w-full max-w-full">
-                                                
-                                                {/* Nút dán kết hợp Mục 5 & Mục 6 */}
-                                                <button 
-                                                    onClick={() => {
-                                                        const muc5 = formData.muc5_noiDung ? formData.muc5_noiDung.trim() : "";
-                                                        let muc6 = formData.muc6_phamVi ? formData.muc6_phamVi.trim() : "";
-                                                        if (muc6.length > 0) muc6 = muc6.charAt(0).toLowerCase() + muc6.slice(1);
-                                                        
-                                                        let textToAdd = "";
-                                                        if (muc5 || muc6) {
-                                                            let combined = `- ${muc5} ${muc6}`.trim();
-                                                            if (!combined.endsWith('.')) combined += '.';
-                                                            textToAdd = combined;
-                                                        }
-                                                        if (!textToAdd) return; 
-                                                        
-                                                        const newData = [...formData.muc8_bangData];
-                                                        newData[index].congViec = newData[index].congViec ? `${newData[index].congViec}\n${textToAdd}` : textToAdd;
-                                                        setFormData({...formData, muc8_bangData: newData});
-                                                    }}
-                                                    className="tag-btn text-xs self-start w-fit bg-green-50 text-green-700 border-green-200 shrink-0 mb-1"
-                                                    title="Tự động ghép: - [Mục 5] [mục 6]"
-                                                >
-                                                    <UI_Icons.Plus size={14}/> Dán Nội dung công việc
-                                                </button>
+                                            <div className="flex flex-col gap-2 w-full">
 
-                                                {/* --- NÚT MỞ CỬA SỔ TÌM KIẾM --- */}
-                                                <button 
+                                                {/* NÚT MỞ POPUP CHỌN MỐI NGUY */}
+                                                <button
                                                     onClick={() => {
                                                         const newData = [...formData.muc8_bangData];
-                                                        newData[index].isModalOpen = true; 
+                                                        newData[index].isModalOpen = true;
                                                         setFormData({...formData, muc8_bangData: newData});
                                                     }}
                                                     className="bg-purple-600 text-white w-full py-2 rounded-lg text-sm font-bold hover:bg-purple-700 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2"
                                                 >
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                                    Chọn Mối nguy & Biện pháp
+                                                    {row.moi_nguy_id ? "Đổi Mối nguy" : "Chọn Mối nguy"}
                                                 </button>
 
-                                                {/* --- MODAL CHỌN MỐI NGUY (ĐÃ NÂNG CẤP TABS TA/HA) --- */}
+                                                {/* POPUP CHỌN MỐI NGUY */}
                                                 {row.isModalOpen && (
                                                     <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4 animate-zoom-in" style={{ margin: 0 }} onClick={() => {
                                                         const newData = [...formData.muc8_bangData];
-                                                        newData[index].isModalOpen = false; 
-                                                        newData[index].searchRisk = ""; // Reset thanh tìm kiếm khi đóng
+                                                        newData[index].isModalOpen = false;
+                                                        newData[index].searchRisk = "";
                                                         setFormData({...formData, muc8_bangData: newData});
                                                     }}>
-                                                        
-                                                        {/* Khung nội dung chính */}
                                                         <div className="bg-white border border-gray-200 rounded-xl flex flex-col shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                                                            
-                                                            {/* Header của Popup */}
+
+                                                            {/* HEADER POPUP */}
                                                             <div className="text-sm md:text-base font-bold text-white px-4 py-3 bg-blue-600 flex justify-between items-center shrink-0">
-                                                                <span className="truncate pr-2 uppercase">CHỌN MỐI NGUY & BIỆN PHÁP</span>
-                                                                <button 
+                                                                <span className="truncate pr-2 uppercase">CHỌN MỐI NGUY</span>
+                                                                <button
                                                                     onClick={() => {
                                                                         const newData = [...formData.muc8_bangData];
                                                                         newData[index].isModalOpen = false;
@@ -4289,39 +4678,18 @@ const generateDiagramImage = async (data) => {
                                                                 </button>
                                                             </div>
 
-                                                            {/* --- 3 TABS LỌC CẤP ĐIỆN ÁP --- */}
-                                                            <div className="flex bg-white border-b border-gray-200 shrink-0">
-                                                                <button 
-                                                                    onClick={() => { const d=[...formData.muc8_bangData]; d[index].activeTab='ALL'; setFormData({...formData, muc8_bangData: d}); }} 
-                                                                    className={`flex-1 py-2.5 text-sm font-bold text-center border-b-2 transition-colors ${(!row.activeTab || row.activeTab === 'ALL') ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
-                                                                >
-                                                                    ⚡ Tất cả
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => { const d=[...formData.muc8_bangData]; d[index].activeTab='TA'; setFormData({...formData, muc8_bangData: d}); }} 
-                                                                    className={`flex-1 py-2.5 text-sm font-bold text-center border-b-2 transition-colors ${row.activeTab === 'TA' ? 'border-red-500 text-red-600 bg-red-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
-                                                                >
-                                                                    🔴 Trung Áp
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => { const d=[...formData.muc8_bangData]; d[index].activeTab='HA'; setFormData({...formData, muc8_bangData: d}); }} 
-                                                                    className={`flex-1 py-2.5 text-sm font-bold text-center border-b-2 transition-colors ${row.activeTab === 'HA' ? 'border-green-500 text-green-600 bg-green-50/50' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
-                                                                >
-                                                                    🔵 Hạ Áp
-                                                                </button>
-                                                            </div>
 
-                                                            {/* THANH TÌM KIẾM (SEARCH BAR) */}
+                                                            {/* THANH TÌM KIẾM */}
                                                             <div className="p-3 bg-gray-50 border-b border-gray-200 shrink-0">
                                                                 <div className="relative">
-                                                                    <input 
-                                                                        type="text" 
+                                                                    <input
+                                                                        type="text"
                                                                         className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-bold text-blue-900 shadow-inner transition-all"
-                                                                        placeholder="Nhập loại công việc để tìm nhanh..."
+                                                                        placeholder="Tìm mối nguy..."
                                                                         value={row.searchRisk || ""}
                                                                         onChange={e => {
                                                                             const newData = [...formData.muc8_bangData];
-                                                                            newData[index].searchRisk = e.target.value; 
+                                                                            newData[index].searchRisk = e.target.value;
                                                                             setFormData({...formData, muc8_bangData: newData});
                                                                         }}
                                                                         autoFocus
@@ -4332,191 +4700,279 @@ const generateDiagramImage = async (data) => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* PHẦN THÂN: DANH SÁCH LOẠI CÔNG VIỆC TÌM ĐƯỢC */}
-                                                            <div className="overflow-y-auto p-3 flex flex-col gap-2.5 w-full bg-gray-100 flex-1 min-h-0">
+                                                            {/* DANH SÁCH MỐI NGUY */}
+                                                            <div className="overflow-y-auto p-3 flex flex-col gap-2.5 bg-gray-100 flex-1 min-h-0">
                                                                 {(() => {
-                                                                    const currentTab = row.activeTab || 'ALL';
+                                                                    // Lấy danh sách id đã chọn ở các dòng KHÁC
+                                                                    const usedIds = formData.muc8_bangData
+                                                                        .filter((_, i) => i !== index)
+                                                                        .map(r => r.moi_nguy_id)
+                                                                        .filter(Boolean);
 
-                                                                    // Lọc danh sách theo TỪ KHÓA và CẤP ĐIỆN ÁP
-                                                                    const filteredRisks = riskLibrary.risks.filter(r => {
-                                                                        const matchSearch = r.ten_moi_nguy.toLowerCase().includes((row.searchRisk || "").toLowerCase());
-                                                                        const matchTab = currentTab === 'ALL' || r.cap_dien_ap === currentTab;
-                                                                        const isChung = !r.cap_dien_ap; // Các mục Chung luôn hiện
-                                                                        
-                                                                        return matchSearch && (matchTab || isChung);
-                                                                    });
+                                                                    // Lọc theo từ khóa VÀ ẩn mối nguy đã dùng ở dòng khác
+                                                                    const filteredRisks = riskLibrary.risks.filter(r =>
+                                                                        r.ten_moi_nguy.toLowerCase().includes((row.searchRisk || "").toLowerCase())
+                                                                        && !usedIds.includes(r.id)
+                                                                    );
 
                                                                     if (filteredRisks.length === 0) {
-                                                                        return <div className="text-center text-gray-400 italic py-6">Không tìm thấy công việc phù hợp trong mục này.</div>;
+                                                                        return <div className="text-center text-gray-400 italic py-6">Không tìm thấy mối nguy phù hợp.</div>;
                                                                     }
 
-                                                                    return filteredRisks.map(r => (
-                                                                        <div key={r.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm transition-all shrink-0">
-                                                                            
-                                                                            {/* Header của Nhóm Công Việc (Click để mở rộng) */}
-                                                                            <div 
-                                                                                className={`p-3 font-bold text-sm md:text-base cursor-pointer flex justify-between items-center transition-colors ${row.tempRiskId === r.id ? 'bg-blue-50 text-blue-700 border-b border-blue-100' : 'text-gray-700 hover:bg-gray-50'}`}
-                                                                                onClick={() => {
-                                                                                    const newData = [...formData.muc8_bangData];
-                                                                                    newData[index].tempRiskId = row.tempRiskId === r.id ? null : r.id; 
-                                                                                    setFormData({...formData, muc8_bangData: newData});
-                                                                                }}
-                                                                            >
-                                                                                <span className="flex items-center gap-2">
-                                                                                    <UI_Icons.FolderOpen size={16} />
-                                                                                    {r.ten_moi_nguy}
-                                                                                    {r.cap_dien_ap === 'TA' && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200 ml-1 shrink-0">TA</span>}
-                                                                                    {r.cap_dien_ap === 'HA' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 ml-1 shrink-0">HA</span>}
-                                                                                </span>
-                                                                                <div className={`transform transition-transform shrink-0 ${row.tempRiskId === r.id ? 'rotate-180' : ''}`}>
-                                                                                    {row.tempRiskId === r.id ? <UI_Icons.Minus size={18}/> : <UI_Icons.Plus size={18}/>}
+                                                                    return filteredRisks.map(r => {
+                                                                        const bienPhapList = riskLibrary.measures.filter(m => m.moi_nguy_id === r.id);
+                                                                        const isSelected = row.moi_nguy_id === r.id;
+
+                                                                        return (
+                                                                            <div key={r.id} className={`bg-white rounded-lg border overflow-hidden shadow-sm transition-all shrink-0 ${isSelected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-200'}`}>
+
+                                                                                {/* TÊN MỐI NGUY + NÚT CHỌN */}
+                                                                                <div className="p-3 flex justify-between items-center gap-3">
+                                                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                                        <span className="font-bold text-sm text-gray-800 break-words leading-snug">
+                                                                                            {r.ten_moi_nguy}
+                                                                                        </span>
+                                                                                        {r.cap_dien_ap === 'TA' && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200 shrink-0">TA</span>}
+                                                                                        {r.cap_dien_ap === 'HA' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 shrink-0">HA</span>}
+                                                                                    </div>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            // Ghép biện pháp: "• bp1.\n• bp2."
+                                                                                            const bpText = bienPhapList.length > 0
+                                                                                                ? bienPhapList.map(m => m.noi_dung).join('\n')
+                                                                                                : "";
+                                                                                            const newData = [...formData.muc8_bangData];
+                                                                                            newData[index].moi_nguy_id = r.id;
+                                                                                            newData[index].congViec = r.ten_moi_nguy;
+                                                                                            newData[index].bienPhap = bpText;
+                                                                                            newData[index].isModalOpen = false;
+                                                                                            newData[index].searchRisk = "";
+                                                                                            setFormData({...formData, muc8_bangData: newData});
+                                                                                        }}
+                                                                                        className={`px-4 py-2 rounded-lg text-sm font-bold shrink-0 transition-all shadow active:scale-95 ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+                                                                                    >
+                                                                                        {isSelected ? '✓ Đã chọn' : 'Chọn'}
+                                                                                    </button>
                                                                                 </div>
-                                                                            </div>
 
-                                                                            {/* Danh sách Biện pháp (Xổ xuống khi click) */}
-                                                                            {row.tempRiskId === r.id && (
-                                                                                <div className="p-2 bg-gray-50 flex flex-col gap-2 animate-zoom-in">
-                                                                                    {(() => {
-                                                                                        const availableMeasures = riskLibrary.measures
-                                                                                            .filter(m => m.moi_nguy_id === r.id)
-                                                                                            .filter(m => !(row.congViec || "").includes(m.noi_dung));
-
-                                                                                        if (availableMeasures.length === 0) {
-                                                                                            return <div className="text-sm text-green-700 italic font-bold p-4 text-center bg-green-50 border border-green-200 rounded">Đã dán toàn bộ biện pháp của mục này!</div>;
-                                                                                        }
-
-                                                                                        return availableMeasures.map(m => (
-                                                                                            <div key={m.id} className="flex gap-3 items-center bg-white p-3 rounded-lg border border-gray-200 shadow-sm w-full transition-colors hover:border-purple-300 shrink-0">
-                                                                                                <div className="flex-1 text-sm text-gray-800 break-words leading-relaxed font-medium">
-                                                                                                    {m.noi_dung}
-                                                                                                </div>
-                                                                                                <button 
-                                                                                                    onClick={() => {
-                                                                                                        const textToAdd = `- ${m.noi_dung}`;
-                                                                                                        const newData = [...formData.muc8_bangData];
-                                                                                                        newData[index].congViec = newData[index].congViec ? `${newData[index].congViec}\n${textToAdd}` : textToAdd;
-                                                                                                        setFormData({...formData, muc8_bangData: newData});
-                                                                                                    }}
-                                                                                                    className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 active:scale-95 shrink-0 flex items-center gap-1.5 transition-all shadow"
-                                                                                                >
-                                                                                                    <UI_Icons.Plus size={16}/> Dán
-                                                                                                </button>
+                                                                                {/* BIỆN PHÁP KÈM THEO (tham khảo) */}
+                                                                                {bienPhapList.length > 0 ? (
+                                                                                    <div className="px-3 pb-3 flex flex-col gap-1 bg-blue-50/60 border-t border-blue-100">
+                                                                                        <div className="text-[11px] font-bold text-blue-500 uppercase tracking-wide pt-2 mb-0.5">Biện pháp an toàn:</div>
+                                                                                        {bienPhapList.map(m => (
+                                                                                            <div key={m.id} className="flex gap-2 items-start text-sm text-gray-700 leading-relaxed">
+                                                                                                <span className="text-blue-400 shrink-0 mt-0.5">•</span>
+                                                                                                <span>{m.noi_dung}.</span>
                                                                                             </div>
-                                                                                        ));
-                                                                                    })()}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ));
+                                                                                        ))}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="px-3 pb-2 border-t border-gray-100">
+                                                                                        <div className="text-[11px] italic text-gray-400 pt-1.5">Không có biện pháp mẫu — tự nhập ở cột biện pháp.</div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    });
                                                                 })()}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
 
-                                            {/* Ô nhập text tự động giãn nở (Auto-resize) */}
-                                            <div className="grid w-full">
-                                                <div className="col-start-1 row-start-1 invisible whitespace-pre-wrap break-words min-h-[100px] text-sm leading-relaxed font-medium">
-                                                    {row.congViec ? row.congViec + '\n' : 'Nhập công việc và nhận diện...'}
+                                                {/* TEXTAREA HIỂN THỊ TÊN MỐI NGUY (có thể sửa tay) */}
+                                                <div className="grid w-full">
+                                                    <div className="col-start-1 row-start-1 invisible whitespace-pre-wrap break-words min-h-[60px] text-sm leading-relaxed font-medium">
+                                                        {row.congViec ? row.congViec + '\n' : 'Chưa chọn mối nguy...'}
+                                                    </div>
+                                                    <textarea
+                                                        className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-medium text-blue-900 bg-transparent min-h-[60px] text-sm leading-relaxed overflow-hidden"
+                                                        value={row.congViec}
+                                                        onChange={e => {
+                                                            const newData = [...formData.muc8_bangData];
+                                                            newData[index].congViec = e.target.value;
+                                                            setFormData({...formData, muc8_bangData: newData});
+                                                        }}
+                                                        placeholder="Chưa chọn mối nguy..."
+                                                    ></textarea>
                                                 </div>
-                                                <textarea 
-                                                    className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-medium text-blue-900 bg-transparent min-h-[100px] text-sm leading-relaxed overflow-hidden" 
-                                                    value={row.congViec} 
-                                                    onChange={e => { const newData = [...formData.muc8_bangData]; newData[index].congViec = e.target.value; setFormData({...formData, muc8_bangData: newData}); }}
-                                                    placeholder="Nhập công việc và nhận diện..."
-                                                ></textarea>
+
                                             </div>
                                         </td>
 
 
-                                        {/* CỘT 3: BIỆN PHÁP AN TOÀN (Cơ chế List + Dán) */}
+                                        {/* CỘT 3: BIỆN PHÁP AN TOÀN (Popup) */}
                                         <td className="border border-gray-300 p-2 align-top">
-                                            <div className="flex items-center gap-1 mb-2 pb-2 border-b border-gray-100">
-                                                <select 
-                                                    id={`sel-bp-${index}`}
-                                                    className="flex-1 border rounded px-1 py-1 text-xs bg-gray-50 outline-none focus:border-blue-500"
-                                                >
-                                                    <option value="">-- Chọn mẫu biện pháp --</option>
-                                                    {tags9a.map((t, i) => (
-                                                        <option key={i} value={i}>{t.label}</option>
-                                                    ))}
-                                                </select>
-                                                <button 
+                                            <div className="flex flex-col gap-2 w-full">
+
+                                                {/* NÚT MỞ POPUP CHỌN MẪU BIỆN PHÁP */}
+                                                <button
                                                     onClick={() => {
-                                                        const sel = document.getElementById(`sel-bp-${index}`);
-                                                        if (!sel.value) return; // Không làm gì nếu chưa chọn mẫu
-                                                        
-                                                        const t = tags9a[sel.value];
-                                                        let textToAdd = t.content;
-                                                        const ctx = getContextData();
-                                                        
-                                                        // Thay thế các biến {tru_chinh}, {tru}, {tuyen} tự động
-                                                        textToAdd = textToAdd.replace(/{tru_chinh}/g, ctx.code || "...").replace(/{tru}/g, `${ctx.code}${ctx.sub ? "/" + ctx.sub : ""}`).replace(/{tuyen}/g, ctx.line || "...");
-                                                        
-                                                        // Logic xuống dòng hoặc nối tiếp
-                                                        const sep = t.inline ? " " : "\n";
                                                         const newData = [...formData.muc8_bangData];
-                                                        newData[index].bienPhap = newData[index].bienPhap ? newData[index].bienPhap + sep + textToAdd : textToAdd;
-                                                        
+                                                        newData[index].isBPModalOpen = true;
                                                         setFormData({...formData, muc8_bangData: newData});
                                                     }}
-                                                    className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm flex items-center gap-1 shrink-0"
+                                                    className="bg-blue-600 text-white w-full py-2 rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2"
                                                 >
-                                                    <UI_Icons.Plus size={12}/> Dán
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                                    Chọn mẫu biện pháp
                                                 </button>
-                                            </div>
-                                            {/* Ô nhập text tự động giãn nở (Auto-resize) */}
-                                            <div className="grid w-full mt-2">
-                                                {/* Khung tàng hình đo chiều cao cho biện pháp */}
-                                                <div className="col-start-1 row-start-1 invisible whitespace-pre-wrap break-words min-h-[100px] text-sm leading-relaxed font-medium">
-                                                    {row.bienPhap ? row.bienPhap + '\n' : 'Nhập biện pháp an toàn...'}
+
+                                                {/* POPUP CHỌN MẪU BIỆN PHÁP */}
+                                                {row.isBPModalOpen && (
+                                                    <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4 animate-zoom-in" style={{ margin: 0 }} onClick={() => {
+                                                        const newData = [...formData.muc8_bangData];
+                                                        newData[index].isBPModalOpen = false;
+                                                        newData[index].searchBP = "";
+                                                        setFormData({...formData, muc8_bangData: newData});
+                                                    }}>
+                                                        <div className="bg-white border border-gray-200 rounded-xl flex flex-col shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+
+                                                            {/* HEADER */}
+                                                            <div className="text-sm md:text-base font-bold text-white px-4 py-3 bg-blue-600 flex justify-between items-center shrink-0">
+                                                                <span className="uppercase truncate pr-2">CHỌN MẪU BIỆN PHÁP AN TOÀN</span>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const newData = [...formData.muc8_bangData];
+                                                                        newData[index].isBPModalOpen = false;
+                                                                        newData[index].searchBP = "";
+                                                                        setFormData({...formData, muc8_bangData: newData});
+                                                                    }}
+                                                                    className="hover:bg-red-500 bg-blue-700 p-1.5 rounded-lg cursor-pointer transition-colors shrink-0"
+                                                                >
+                                                                    <UI_Icons.X size={18}/>
+                                                                </button>
+                                                            </div>
+
+                                                            {/* THANH TÌM KIẾM */}
+                                                            <div className="p-3 bg-gray-50 border-b border-gray-200 shrink-0">
+                                                                <div className="relative">
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-bold text-blue-900 shadow-inner transition-all"
+                                                                        placeholder="Tìm mẫu biện pháp..."
+                                                                        value={row.searchBP || ""}
+                                                                        onChange={e => {
+                                                                            const newData = [...formData.muc8_bangData];
+                                                                            newData[index].searchBP = e.target.value;
+                                                                            setFormData({...formData, muc8_bangData: newData});
+                                                                        }}
+                                                                        autoFocus
+                                                                    />
+                                                                    <div className="absolute left-3 top-3 text-gray-400">
+                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* DANH SÁCH MẪU BIỆN PHÁP */}
+                                                            <div className="overflow-y-auto p-3 flex flex-col gap-2 bg-gray-100 flex-1 min-h-0">
+                                                                {(() => {
+                                                                    const filtered = tags9a.filter(t =>
+                                                                        t.label.toLowerCase().includes((row.searchBP || "").toLowerCase())
+                                                                    );
+                                                                    if (filtered.length === 0) {
+                                                                        return <div className="text-center text-gray-400 italic py-6">Không tìm thấy mẫu phù hợp.</div>;
+                                                                    }
+                                                                    return filtered.map((t, i) => {
+                                                                        const ctx = getContextData();
+                                                                        let preview = t.content
+                                                                            .replace(/{tru_chinh}/g, ctx.code || "...")
+                                                                            .replace(/{tru}/g, `${ctx.code}${ctx.sub ? "/" + ctx.sub : ""}`)
+                                                                            .replace(/{tuyen}/g, ctx.line || "...");
+                                                                        return (
+                                                                            <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden shrink-0">
+                                                                                <div className="p-3 flex justify-between items-center gap-3">
+                                                                                    <div className="flex-1 min-w-0">
+                                                                                        <div className="font-bold text-sm text-gray-800">{t.label}</div>
+                                                                                        <div className="text-xs text-gray-500 mt-0.5 break-words leading-relaxed">{preview}</div>
+                                                                                    </div>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const sep = t.inline ? " " : "\n";
+                                                                                            const newData = [...formData.muc8_bangData];
+                                                                                            newData[index].bienPhap = newData[index].bienPhap
+                                                                                                ? newData[index].bienPhap + sep + preview
+                                                                                                : preview;
+                                                                                            newData[index].isBPModalOpen = false;
+                                                                                            newData[index].searchBP = "";
+                                                                                            setFormData({...formData, muc8_bangData: newData});
+                                                                                        }}
+                                                                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 shrink-0 flex items-center gap-1.5 transition-all shadow"
+                                                                                    >
+                                                                                        <UI_Icons.Plus size={16}/> Dán
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    });
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* TEXTAREA BIỆN PHÁP (auto-resize) */}
+                                                <div className="grid w-full">
+                                                    <div className="col-start-1 row-start-1 invisible whitespace-pre-wrap break-words min-h-[100px] text-sm leading-relaxed font-medium">
+                                                        {row.bienPhap ? row.bienPhap + '\n' : 'Nhập biện pháp an toàn...'}
+                                                    </div>
+                                                    <textarea
+                                                        className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-medium text-blue-900 bg-transparent min-h-[100px] text-sm leading-relaxed overflow-hidden"
+                                                        value={row.bienPhap}
+                                                        onChange={e => { const newData = [...formData.muc8_bangData]; newData[index].bienPhap = e.target.value; setFormData({...formData, muc8_bangData: newData}); }}
+                                                        placeholder="Nhập biện pháp an toàn..."
+                                                    ></textarea>
                                                 </div>
-                                                {/* Ô nhập liệu thực tế */}
-                                                <textarea 
-                                                    className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-medium text-blue-900 bg-transparent min-h-[100px] text-sm leading-relaxed overflow-hidden" 
-                                                    value={row.bienPhap} 
-                                                    onChange={e => { const newData = [...formData.muc8_bangData]; newData[index].bienPhap = e.target.value; setFormData({...formData, muc8_bangData: newData}); }}
-                                                    placeholder="Nhập biện pháp an toàn..."
-                                                ></textarea>
+
                                             </div>
                                         </td>
 
-                                        {/* CỘT 4: ĐƠN VỊ THỰC HIỆN (Đã đổi sang Textarea tự giãn dòng) */}
+                                        {/* CỘT 4: ĐƠN VỊ THỰC HIỆN */}
                                         <td className="border border-gray-300 p-2 align-top w-[120px] md:w-[150px]">
                                             <div className="flex flex-col gap-2 items-center w-full">
-                                                
+
                                                 {/* Ô nhập text tự động giãn nở (Auto-resize) */}
                                                 <div className="grid w-full">
-                                                    {/* Khung tàng hình đo chiều cao */}
                                                     <div className="col-start-1 row-start-1 invisible whitespace-pre-wrap break-words min-h-[30px] text-sm font-bold text-center">
                                                         {row.donVi ? row.donVi + '\n' : 'Đơn vị...'}
                                                     </div>
-                                                    {/* Ô nhập liệu thực tế */}
-                                                    <textarea 
-                                                        className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-bold text-blue-900 bg-transparent min-h-[30px] text-sm text-center overflow-hidden" 
-                                                        value={row.donVi} 
+                                                    <textarea
+                                                        className="col-start-1 row-start-1 w-full h-full resize-none outline-none font-bold text-blue-900 bg-transparent min-h-[30px] text-sm text-center overflow-hidden"
+                                                        value={row.donVi}
                                                         onChange={e => { const newData = [...formData.muc8_bangData]; newData[index].donVi = e.target.value; setFormData({...formData, muc8_bangData: newData}); }}
                                                         placeholder="Đơn vị..."
                                                         rows={1}
                                                     ></textarea>
                                                 </div>
 
-                                                {/* Dropdown Gợi ý chọn nhanh */}
-                                                <select 
-                                                    className="w-full border rounded px-1 py-1 text-xs text-gray-500 outline-none focus:border-blue-400 text-center"
-                                                    value=""
-                                                    onChange={e => {
-                                                        if (!e.target.value) return;
-                                                        const newData = [...formData.muc8_bangData];
-                                                        newData[index].donVi = e.target.value;
-                                                        setFormData({...formData, muc8_bangData: newData});
-                                                    }}
-                                                >
-                                                    <option value="">-- Gợi ý --</option>
-                                                    <option value="Tổ QLVH">Tổ QLVH</option>
-                                                    <option value="Tổ KD">Tổ KD</option>
-                                                </select>
+                                                {/* 2 NÚT COPY / DÁN */}
+                                                <div className="flex gap-1 w-full">
+                                                    <button
+                                                        title="Copy nội dung ô này"
+                                                        onClick={() => setClipboardDonVi(row.donVi || "")}
+                                                        className={`flex-1 flex items-center justify-center gap-1 py-1 rounded text-xs font-bold border transition-all active:scale-95
+                                                            ${clipboardDonVi === row.donVi && row.donVi ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}
+                                                    >
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                                        Copy
+                                                    </button>
+                                                    <button
+                                                        title={clipboardDonVi ? `Dán: "${clipboardDonVi}"` : "Chưa có gì để dán"}
+                                                        onClick={() => {
+                                                            if (!clipboardDonVi) return;
+                                                            const newData = [...formData.muc8_bangData];
+                                                            newData[index].donVi = clipboardDonVi;
+                                                            setFormData({...formData, muc8_bangData: newData});
+                                                        }}
+                                                        className={`flex-1 flex items-center justify-center gap-1 py-1 rounded text-xs font-bold border transition-all active:scale-95
+                                                            ${clipboardDonVi ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'}`}
+                                                    >
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                                                        Dán
+                                                    </button>
+                                                </div>
+
                                             </div>
                                         </td>
 
@@ -4529,7 +4985,7 @@ const generateDiagramImage = async (data) => {
                                 <tr>
                                     <td colSpan="5" className="border border-gray-300 bg-gray-50 p-1 text-center">
                                         <button 
-                                            onClick={() => setFormData({...formData, muc8_bangData: [...formData.muc8_bangData, { congViec: "", bienPhap: "", donVi: "" }]})}
+                                            onClick={() => setFormData({...formData, muc8_bangData: [...formData.muc8_bangData, { moi_nguy_id: null, congViec: "", bienPhap: "", donVi: "" }]})}
                                             className="text-sm font-bold text-blue-600 flex items-center justify-center gap-1 w-full py-1 hover:bg-blue-100 rounded transition-colors"
                                         >
                                             <UI_Icons.Plus size={16}/> Thêm dòng công việc / rủi ro
@@ -4548,13 +5004,16 @@ const generateDiagramImage = async (data) => {
                     {/* CHÂN BIÊN BẢN + TRẠNG THÁI CHỮ KÝ */}
                     {(() => {
                         const formatDT = (iso) => formatVNDateTime(iso);
-                        const getSig = (userId) => signatureStatus.find(s => s.user_id === userId);
 
-                        const renderSigBox = (label, name, userId) => {
-                            const sig = userId ? getSig(userId) : null;
+                        const getSig = (vaiTro, thuTu) => signatureStatus.find(
+                            s => s.vai_tro === vaiTro && s.thu_tu === thuTu
+                        );
+
+                        const renderSigBox = (name, vaiTro, thuTu) => {
+                            if (!name) return null;
+                            const sig = getSig(vaiTro, thuTu);
                             return (
-                                <div className="flex flex-col items-center text-center">
-                                    <div className="font-bold text-xs md:text-sm uppercase mb-2">{label}</div>
+                                <div className="flex flex-col items-center text-center mb-3">
                                     <div className="w-full min-h-[80px] border border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-2 bg-gray-50 relative overflow-hidden">
                                         {sig?.trang_thai === 'da_ky' && sig?.profiles?.chu_ky_url ? (
                                             <img src={sig.profiles.chu_ky_url} alt="Chữ ký" className="max-h-20 max-w-full object-contain p-1"/>
@@ -4566,8 +5025,7 @@ const generateDiagramImage = async (data) => {
                                     </div>
                                     {sig?.trang_thai === 'da_ky' ? (
                                         <div className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1 leading-snug">
-                                            <div className="font-bold">✓ Đã ký: {sig.profiles?.ho_ten}</div>
-                                            <div className="text-gray-500">{sig.profiles?.email}</div>
+                                            <div className="font-bold">✓ {sig.profiles?.ho_ten}</div>
                                             <div className="text-gray-500">{formatDT(sig.thoi_gian_ky)}</div>
                                         </div>
                                     ) : (
@@ -4579,9 +5037,25 @@ const generateDiagramImage = async (data) => {
 
                         return (
                             <div className="grid grid-cols-3 gap-4 mb-20">
-                                {renderSigBox("ĐƠN VỊ CÔNG TÁC", formData.dvct_daiDien1, formData.dvct_userId1)}
-                                {renderSigBox("ĐƠN VỊ QLVH", formData.qlvh_daiDien1, formData.qlvh_userId1)}
-                                {renderSigBox("ĐƠN VỊ LIÊN QUAN KHÁC", "", null)}
+                                {/* CỘT 1: ĐƠN VỊ CÔNG TÁC */}
+                                <div className="flex flex-col">
+                                    <div className="font-bold text-xs md:text-sm uppercase text-center mb-3">ĐƠN VỊ CÔNG TÁC</div>
+                                    {renderSigBox(formData.dvct_daiDien1, 'dvct', 1)}
+                                    {renderSigBox(formData.dvct_daiDien2, 'dvct', 2)}
+                                </div>
+
+                                {/* CỘT 2: ĐƠN VỊ QLVH */}
+                                <div className="flex flex-col">
+                                    <div className="font-bold text-xs md:text-sm uppercase text-center mb-3">ĐƠN VỊ QLVH</div>
+                                    {renderSigBox(formData.qlvh_daiDien1, 'qlvh', 1)}
+                                    {renderSigBox(formData.qlvh_daiDien2, 'qlvh', 2)}
+                                    {renderSigBox(formData.qlvh_daiDien3, 'qlvh', 3)}
+                                </div>
+
+                                {/* CỘT 3: ĐƠN VỊ LIÊN QUAN KHÁC */}
+                                <div className="flex flex-col">
+                                    <div className="font-bold text-xs md:text-sm uppercase text-center mb-3">ĐƠN VỊ LIÊN QUAN KHÁC</div>
+                                </div>
                             </div>
                         );
                     })()}
@@ -4615,6 +5089,7 @@ const generateDiagramImage = async (data) => {
                 </div>
                 <div className="h-20"></div>
             </div>
+            </ToastContext.Provider>
         );
     };
 
